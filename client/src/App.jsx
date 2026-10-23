@@ -8,6 +8,7 @@ import { Login, Register } from './pages/Auth.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import PetDetail from './pages/PetDetail.jsx';
 import { EditPet, NewPet } from './pages/PetForm.jsx';
+import Onboard from './pages/Onboard.jsx';
 import Pets from './pages/Pets.jsx';
 import SharedProfile from './pages/SharedProfile.jsx';
 
@@ -56,6 +57,7 @@ export default function App() {
       <Route path="/ingresar" element={<GuestOnly><Login /></GuestOnly>} />
       <Route path="/registro" element={<GuestOnly><Register /></GuestOnly>} />
       <Route path="/compartido/:token" element={<SharedProfile />} />
+      <Route path="/onboard" element={<Onboard />} />
       <Route element={<RequireAuth><Layout /></RequireAuth>}>
         <Route index element={<Dashboard />} />
         <Route path="mascotas" element={<Pets />} />

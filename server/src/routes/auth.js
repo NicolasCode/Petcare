@@ -6,6 +6,7 @@ import { query } from '../db.js';
 import { isAdminEmail } from '../config.js';
 import { HttpError } from '../errors.js';
 import { clearSessionCookie, requireAuth, setSessionCookie } from '../auth.js';
+import { DEMO_EMAIL } from '../seed-demo.js';
 
 const router = Router();
 
@@ -60,6 +61,23 @@ router.post('/login', authLimiter, async (req, res) => {
   if (!ok) throw new HttpError(401, 'Correo o contraseña incorrectos');
   setSessionCookie(res, user);
   res.json({ user: publicUser(user) });
+});
+
+// Acceso de un clic a la cuenta demo; solo existe mientras SEED_DEMO=true
+const demoEnabled = () => process.env.SEED_DEMO === 'true';
+
+router.get('/demo', (req, res) => {
+  if (!demoEnabled()) return res.json({ enabled: false });
+  // La contraseña solo se muestra si es la pública por defecto
+  res.json({ enabled: true, email: DEMO_EMAIL, password: process.env.DEMO_PASSWORD ? null : 'kurapet-demo' });
+});
+
+router.post('/demo', authLimiter, async (req, res) => {
+  if (!demoEnabled()) throw new HttpError(404, 'La demo no está activa');
+  const { rows } = await query('SELECT * FROM users WHERE lower(email) = $1', [DEMO_EMAIL]);
+  if (!rows[0]) throw new HttpError(404, 'La cuenta demo aún no se ha creado');
+  setSessionCookie(res, rows[0]);
+  res.json({ user: publicUser(rows[0]) });
 });
 
 router.post('/logout', (req, res) => {
