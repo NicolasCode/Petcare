@@ -31,7 +31,7 @@ Requisitos: Node 22.12+ y PostgreSQL 16.
 cp .env.example .env          # ajusta DATABASE_URL, JWT_SECRET y ADMIN_EMAILS
 createdb kurapet
 npm install
-npm run seed:demo --workspace server   # opcional: 6 lugares FICTICIOS para probar el mapa
+npm run seed:demo                      # opcional: cuenta demo@kurapet.co / kurapet-demo con datos ficticios
 npm run dev                            # API en :3000 y web en http://localhost:5173
 ```
 
@@ -46,7 +46,9 @@ npm test
 
 ## Despliegue en Railway
 
-1. **New Project → Deploy from GitHub repo** y elige este repositorio. Railway lee `railway.json` y construye con el `Dockerfile`.
+La app es **un solo servicio**: el mismo contenedor compila el frontend y lo sirve junto a la API (mismo dominio, así funcionan la cookie de sesión y las rutas `/api`). No crees un servicio aparte para `client/`.
+
+1. **New Project → Deploy from GitHub repo** y elige este repositorio. Deja **Root Directory** vacío (raíz del repo): Railway lee `railway.json` y construye con el `Dockerfile`.
 2. En el mismo proyecto: **+ New → Database → PostgreSQL**. Revisa en el servicio de base de datos que la imagen sea la versión 16 (si la plantilla trae otra, cambia el tag de la imagen a `16`).
 3. En el servicio de la app, pestaña **Variables**:
 
@@ -60,7 +62,13 @@ npm test
 4. **Settings → Networking → Generate Domain**. El healthcheck es `/api/health`.
 5. Regístrate con el correo de `ADMIN_EMAILS` y carga las clínicas reales desde **Cerca de mí → Agregar lugar** (coordenadas: clic derecho en Google Maps → copiar).
 
-> No ejecutes `seed:demo` en producción: son lugares inventados.
+### Datos de demostración
+
+Agrega la variable `SEED_DEMO=true` al servicio y deja que se redespliegue. Al arrancar se crea (o se reinicia, con fechas frescas) la cuenta **`demo@kurapet.co` / `kurapet-demo`** (cámbiala con `DEMO_PASSWORD`) con dos mascotas, Timothy y Luna, y su historia clínica completa: alergia grave, vacunas al día y vencidas, tratamiento en curso, cita próxima, curva de peso y alimento por acabarse. Además carga 8 lugares ficticios en el mapa.
+
+Con `SEED_DEMO=true` la cuenta demo se reinicia en cada despliegue o reinicio; cuando termine la demo, bórrala o ponla en `false`. Localmente: `npm run seed:demo`.
+
+> Los lugares de la demo son inventados: no los dejes en una instalación real.
 
 ## Estructura
 
