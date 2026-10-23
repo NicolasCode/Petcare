@@ -102,6 +102,9 @@ export function Login() {
       <p className="auth-switch">
         ¿No tienes cuenta? <Link to="/registro">Crea una gratis</Link>
       </p>
+      <p className="auth-switch">
+        <Link to="/onboard">Ver el recorrido de la demo</Link>
+      </p>
     </AuthShell>
   );
 }

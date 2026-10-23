@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import Icon from '../components/Icon.jsx';
 import { PageHeader } from '../components/Layout.jsx';
 import { ConfirmModal } from '../components/Modal.jsx';
@@ -37,6 +38,9 @@ export default function Account() {
       </section>
 
       <div className="stack">
+        <Link className="btn btn-secondary btn-block" to="/onboard">
+          <Icon name="list" size={18} /> Recorrido de la demo
+        </Link>
         <button className="btn btn-secondary btn-block" onClick={logout}>
           <Icon name="logout" size={18} /> Cerrar sesión
         </button>

@@ -218,4 +218,22 @@ describe('datos de demostración', () => {
     const places = await agent.get('/api/places?lat=4.68&lng=-74.05');
     assert.ok(places.body.places.length >= 8);
   });
+
+  test('acceso de un clic a la demo solo con SEED_DEMO=true', async () => {
+    delete process.env.SEED_DEMO;
+    assert.deepEqual((await request(app).get('/api/auth/demo')).body, { enabled: false });
+    assert.equal((await request(app).post('/api/auth/demo')).status, 404);
+
+    process.env.SEED_DEMO = 'true';
+    try {
+      const info = await request(app).get('/api/auth/demo');
+      assert.equal(info.body.email, 'demo@kurapet.co');
+      const agent = request.agent(app);
+      const res = await agent.post('/api/auth/demo');
+      assert.equal(res.status, 200);
+      assert.equal((await agent.get('/api/pets')).body.pets.length, 2);
+    } finally {
+      delete process.env.SEED_DEMO;
+    }
+  });
 });

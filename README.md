@@ -66,6 +66,8 @@ La app es **un solo servicio**: el mismo contenedor compila el frontend y lo sir
 
 Agrega la variable `SEED_DEMO=true` al servicio y deja que se redespliegue. Al arrancar se crea (o se reinicia, con fechas frescas) la cuenta **`demo@kurapet.co` / `kurapet-demo`** (cámbiala con `DEMO_PASSWORD`) con dos mascotas, Timothy y Luna, y su historia clínica completa: alergia grave, vacunas al día y vencidas, tratamiento en curso, cita próxima, curva de peso y alimento por acabarse. Además carga 8 lugares ficticios en el mapa.
 
+Abre **`/onboard`** para el recorrido guiado: botón “Entrar a la demo” de un clic, 11 pasos con enlaces directos a cada pantalla, guion de 3 minutos para presentar y alcance del MVP. El acceso de un clic solo existe mientras `SEED_DEMO=true`.
+
 Con `SEED_DEMO=true` la cuenta demo se reinicia en cada despliegue o reinicio; cuando termine la demo, bórrala o ponla en `false`. Localmente: `npm run seed:demo`.
 
 > Los lugares de la demo son inventados: no los dejes en una instalación real.
