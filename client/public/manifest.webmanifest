@@ -1,0 +1,11 @@
+{
+  "name": "KuraPet",
+  "short_name": "KuraPet",
+  "description": "La historia clínica y el cuidado de tu mascota en un solo lugar",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f8fa",
+  "theme_color": "#0f9488",
+  "lang": "es-CO",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
