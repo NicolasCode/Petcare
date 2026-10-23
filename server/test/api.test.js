@@ -197,3 +197,25 @@ describe('directorio de lugares', () => {
     assert.equal(search.body.places.length, 1);
   });
 });
+
+describe('datos de demostración', () => {
+  test('crea la cuenta demo con recordatorios y se puede reiniciar', async () => {
+    const { seedDemo } = await import('../src/seed-demo.js');
+    await seedDemo({ password: 'demo-1234' });
+    await seedDemo({ password: 'demo-1234' }); // idempotente
+
+    const agent = request.agent(app);
+    const login = await agent.post('/api/auth/login').send({ email: 'demo@kurapet.co', password: 'demo-1234' });
+    assert.equal(login.status, 200);
+
+    const { body } = await agent.get(`/api/dashboard?today=${today}`);
+    assert.deepEqual(body.pets.map((p) => p.name), ['Luna', 'Timothy']);
+    assert.equal(body.reminders.food.length, 1);
+    assert.equal(body.reminders.appointments.length, 1);
+    assert.deepEqual(body.reminders.preventive.map((p) => p.name).sort(), ['Desparasitación interna', 'Pipeta antipulgas', 'Rabia']);
+    assert.equal(body.active_medications.length, 1);
+
+    const places = await agent.get('/api/places?lat=4.68&lng=-74.05');
+    assert.ok(places.body.places.length >= 8);
+  });
+});
