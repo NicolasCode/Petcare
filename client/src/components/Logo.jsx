@@ -1,12 +1,33 @@
+// Isotipo de Kaimi (perro + gato con ojos grandes); los colores vienen de variables CSS para el modo oscuro
+export function KaimiMark({ size = 32 }) {
+  return (
+    <svg width={size} height={size * 0.66} viewBox="0 0 128 84" aria-hidden="true" className="kaimi-mark">
+      <g className="km-head">
+        <path d="M36 21C24 11 7 13 3 25c-3 10 4 17 13 14l14-11Z" />
+        <path d="M92 24 115 5c4 11 4 25-1 35L94 32Z" />
+        <circle cx="40" cy="50" r="30" />
+        <circle cx="88" cy="50" r="30" />
+        <rect x="50" y="34" width="28" height="22" rx="6" />
+      </g>
+      <circle className="km-iris" cx="40" cy="51" r="21" />
+      <circle className="km-iris" cx="88" cy="51" r="21" />
+      <circle className="km-pupil" cx="40.5" cy="53" r="12.5" />
+      <circle className="km-pupil" cx="88.5" cy="53" r="12.5" />
+      <circle className="km-shine" cx="45" cy="47.5" r="4" />
+      <circle className="km-shine" cx="93" cy="47.5" r="4" />
+    </svg>
+  );
+}
+
 export default function Logo({ size = 32, withText = true }) {
   return (
     <span className="logo">
-      <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
-        <rect width="64" height="64" rx="14" fill="var(--brand)" />
-        <path d="M32 12 16 18v12c0 10.5 6.8 19.3 16 22 9.2-2.7 16-11.5 16-22V18L32 12Z" fill="#fff" />
-        <path d="M32 40s-8-4.8-8-10.2A4.6 4.6 0 0 1 32 27a4.6 4.6 0 0 1 8 2.8C40 35.2 32 40 32 40Z" fill="var(--brand)" />
-      </svg>
-      {withText && <span className="logo-text">KuraPet</span>}
+      <KaimiMark size={size * 1.25} />
+      {withText && (
+        <span className="logo-text" style={{ fontSize: size * 0.82 }}>
+          kaimi
+        </span>
+      )}
     </span>
   );
 }

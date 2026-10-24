@@ -1,6 +1,6 @@
 import { SPECIES } from '../lib/format.js';
 
-const TINTS = ['#d9f2ee', '#fdecc8', '#e3ecfb', '#fbe1e4', '#e9e3fb', '#dff3df'];
+const TINTS = ['#ece3fa', '#fdecc8', '#e3ecfb', '#fbe1e4', '#e9e3fb', '#dff3df'];
 
 export default function PetAvatar({ pet, size = 48 }) {
   const tint = TINTS[(pet.id ?? 0) % TINTS.length];

@@ -69,7 +69,7 @@ const demoEnabled = () => process.env.SEED_DEMO === 'true';
 router.get('/demo', (req, res) => {
   if (!demoEnabled()) return res.json({ enabled: false });
   // La contraseña solo se muestra si es la pública por defecto
-  res.json({ enabled: true, email: DEMO_EMAIL, password: process.env.DEMO_PASSWORD ? null : 'kurapet-demo' });
+  res.json({ enabled: true, email: DEMO_EMAIL, password: process.env.DEMO_PASSWORD ? null : 'kaimi-demo' });
 });
 
 router.post('/demo', authLimiter, async (req, res) => {

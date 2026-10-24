@@ -16,7 +16,7 @@ export const PREVENTIVE_KINDS = {
 };
 
 export const PLACE_KINDS = {
-  clinica: { label: 'Clínica', color: '#0f9488' },
+  clinica: { label: 'Clínica', color: '#5a33b5' },
   urgencias: { label: 'Urgencias', color: '#d63a4a' },
   farmacia: { label: 'Farmacia', color: '#2f6fd0' },
   domicilio: { label: 'A domicilio', color: '#b26a00' },

@@ -7,7 +7,7 @@ import { pool } from './db.js';
 import { migrate } from './migrate.js';
 import { insertSql } from './validation.js';
 
-export const DEMO_EMAIL = 'demo@kurapet.co';
+export const DEMO_EMAIL = 'demo@kaimi.co';
 
 const day = 86400000;
 const daysAgo = (n) => new Date(Date.now() - n * day).toISOString().slice(0, 10);
@@ -120,7 +120,7 @@ const PETS = [
   },
 ];
 
-export async function seedDemo({ password = process.env.DEMO_PASSWORD || 'kurapet-demo' } = {}) {
+export async function seedDemo({ password = process.env.DEMO_PASSWORD || 'kaimi-demo' } = {}) {
   const hash = await bcrypt.hash(password, 10);
   const client = await pool.connect();
   try {
@@ -136,7 +136,8 @@ export async function seedDemo({ password = process.env.DEMO_PASSWORD || 'kurape
     }
 
     // Reinicia la cuenta demo (el borrado en cascada elimina sus mascotas e historia)
-    await client.query('DELETE FROM users WHERE lower(email) = $1', [DEMO_EMAIL]);
+    // También borra la cuenta demo anterior al cambio de marca (demo@kurapet.co)
+    await client.query("DELETE FROM users WHERE lower(email) IN ($1, 'demo@kurapet.co')", [DEMO_EMAIL]);
     const { rows } = await client.query(
       `INSERT INTO users (name, email, password_hash, consent_at) VALUES ('Nico Demo', $1, $2, now()) RETURNING id`,
       [DEMO_EMAIL, hash],

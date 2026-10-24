@@ -3,7 +3,7 @@ import { config, isAdminEmail } from './config.js';
 import { query } from './db.js';
 import { HttpError } from './errors.js';
 
-export const COOKIE_NAME = 'petcare_session';
+export const COOKIE_NAME = 'kaimi_session';
 
 export function setSessionCookie(res, user) {
   const token = jwt.sign({ sub: user.id }, config.jwtSecret, { expiresIn: `${config.sessionDays}d` });

@@ -21,7 +21,7 @@ async function request(method, url, body) {
   if (res.status === 204) return null;
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    if (res.status === 401 && !url.startsWith('/auth/')) window.dispatchEvent(new Event('kurapet:unauthorized'));
+    if (res.status === 401 && !url.startsWith('/auth/')) window.dispatchEvent(new Event('kaimi:unauthorized'));
     throw new ApiError(res.status, data.error || 'Ocurrió un error inesperado', data.fields);
   }
   return data;
