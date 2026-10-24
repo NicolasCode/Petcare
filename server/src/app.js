@@ -50,7 +50,10 @@ export function createApp() {
 
   // En producción el mismo servicio sirve el frontend compilado
   if (existsSync(clientDist)) {
-    app.use(express.static(clientDist, { index: false, maxAge: '1y', immutable: true }));
+    // Solo los archivos con hash en el nombre (/assets) se cachean para siempre;
+    // íconos, manifest y logo se revalidan para que un cambio de marca se vea de inmediato
+    app.use('/assets', express.static(path.join(clientDist, 'assets'), { maxAge: '1y', immutable: true }));
+    app.use(express.static(clientDist, { index: false }));
     app.get('/{*splat}', (req, res) => {
       res.set('Cache-Control', 'no-cache');
       res.sendFile(path.join(clientDist, 'index.html'));
