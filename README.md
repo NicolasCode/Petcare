@@ -60,6 +60,8 @@ La app es **un solo servicio**: el mismo contenedor compila el frontend y lo sir
    | `ADMIN_EMAILS` | tu correo, para gestionar el directorio de clínicas |
 
 4. **Settings → Networking → Generate Domain**. El healthcheck es `/api/health`.
+
+> El comando de inicio está fijado en `railway.json` (`node server/src/index.js`) y tiene prioridad sobre el panel, así que no hace falta configurar *Custom Start Command*.
 5. Regístrate con el correo de `ADMIN_EMAILS` y carga las clínicas reales desde **Cerca de mí → Agregar lugar** (coordenadas: clic derecho en Google Maps → copiar).
 
 ### Datos de demostración
