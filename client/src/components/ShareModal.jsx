@@ -52,7 +52,7 @@ export default function ShareModal({ pet, open, onClose }) {
   };
 
   const whatsapp = (token) =>
-    `https://wa.me/?text=${encodeURIComponent(`Historia clínica de ${pet.name} en KuraPet (solo lectura): ${linkUrl(token)}`)}`;
+    `https://wa.me/?text=${encodeURIComponent(`Historia clínica de ${pet.name} en Kaimi (solo lectura): ${linkUrl(token)}`)}`;
 
   return (
     <Modal

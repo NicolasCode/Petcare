@@ -1,6 +1,6 @@
-# KuraPet 🐾
+# Kaimi 🐾
 
-**La historia clínica y el cuidado de tu mascota en un solo lugar.**
+**Todo su cuidado, en un solo lugar.** La historia clínica y el cuidado de tu mascota, siempre a mano.
 MVP de la *Fase 1 · Validación & MVP* del roadmap: perfil 360° de la mascota, registro médico, recordatorios y geolocalización básica en Bogotá.
 
 Stack: **React 19 + Vite** (frontend) · **Node 22 + Express 5** (API) · **PostgreSQL 16** · despliegue en **Railway** como un solo servicio.
@@ -29,18 +29,18 @@ Requisitos: Node 22.12+ y PostgreSQL 16.
 
 ```bash
 cp .env.example .env          # ajusta DATABASE_URL, JWT_SECRET y ADMIN_EMAILS
-createdb kurapet
+createdb kaimi
 npm install
-npm run seed:demo                      # opcional: cuenta demo@kurapet.co / kurapet-demo con datos ficticios
+npm run seed:demo                      # opcional: cuenta demo@kaimi.co / kaimi-demo con datos ficticios
 npm run dev                            # API en :3000 y web en http://localhost:5173
 ```
 
 Las migraciones (`server/migrations/*.sql`) se aplican solas al arrancar el servidor; también puedes correr `npm run migrate`.
 
-Pruebas de la API (usan la base `kurapet_test`, o `TEST_DATABASE_URL`, y **la borran**):
+Pruebas de la API (usan la base `kaimi_test`, o `TEST_DATABASE_URL`, y **la borran**):
 
 ```bash
-createdb kurapet_test
+createdb kaimi_test
 npm test
 ```
 
@@ -64,7 +64,7 @@ La app es **un solo servicio**: el mismo contenedor compila el frontend y lo sir
 
 ### Datos de demostración
 
-Agrega la variable `SEED_DEMO=true` al servicio y deja que se redespliegue. Al arrancar se crea (o se reinicia, con fechas frescas) la cuenta **`demo@kurapet.co` / `kurapet-demo`** (cámbiala con `DEMO_PASSWORD`) con dos mascotas, Timothy y Luna, y su historia clínica completa: alergia grave, vacunas al día y vencidas, tratamiento en curso, cita próxima, curva de peso y alimento por acabarse. Además carga 8 lugares ficticios en el mapa.
+Agrega la variable `SEED_DEMO=true` al servicio y deja que se redespliegue. Al arrancar se crea (o se reinicia, con fechas frescas) la cuenta **`demo@kaimi.co` / `kaimi-demo`** (cámbiala con `DEMO_PASSWORD`) con dos mascotas, Timothy y Luna, y su historia clínica completa: alergia grave, vacunas al día y vencidas, tratamiento en curso, cita próxima, curva de peso y alimento por acabarse. Además carga 8 lugares ficticios en el mapa.
 
 Abre **`/onboard`** para el recorrido guiado: botón “Entrar a la demo” de un clic, 11 pasos con enlaces directos a cada pantalla, guion de 3 minutos para presentar y alcance del MVP. El acceso de un clic solo existe mientras `SEED_DEMO=true`.
 

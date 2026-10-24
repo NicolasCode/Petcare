@@ -12,7 +12,7 @@ function AuthShell({ title, subtitle, children }) {
       <aside className="auth-brand">
         <Logo size={40} />
         <div>
-          <h2>Tu mascota tiene un solo lugar para todo.</h2>
+          <h2>Todo su cuidado, en un solo lugar.</h2>
           <ul className="auth-points">
             <li>
               <Icon name="shield" /> Historia clínica portable: vacunas, alergias y peso siempre a mano.

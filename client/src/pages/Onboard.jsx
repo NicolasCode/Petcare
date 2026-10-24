@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon.jsx';
-import Logo from '../components/Logo.jsx';
+import Logo, { KaimiMark } from '../components/Logo.jsx';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import { useToast } from '../lib/toast.jsx';
@@ -206,13 +206,13 @@ export default function Onboard() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    document.title = 'Recorrido de la demo · KuraPet';
+    document.title = 'Recorrido de la demo · Kaimi';
     api
       .get('/auth/demo')
       .then(setDemo)
       .catch(() => setDemo({ enabled: false }));
     return () => {
-      document.title = 'KuraPet';
+      document.title = 'Kaimi';
     };
   }, []);
 
@@ -271,7 +271,7 @@ export default function Onboard() {
   return (
     <div className="onboard">
       <header className="shared-top">
-        <Link to="/" aria-label="KuraPet">
+        <Link to="/" aria-label="Kaimi">
           <Logo size={28} />
         </Link>
         {user ? (
@@ -286,52 +286,57 @@ export default function Onboard() {
       </header>
 
       <section className="ob-hero">
-        <div className="ob-wrap">
-          <p className="ob-kicker">Recorrido de la demo</p>
-          <h1>Tu mascota tiene un solo lugar para todo.</h1>
-          <p className="ob-lead">
-            KuraPet reúne la historia clínica, los recordatorios y los servicios veterinarios cercanos. Esta guía te muestra todo lo que trae la
-            demo, paso a paso, en unos 10 minutos.
-          </p>
+        <div className="ob-wrap ob-hero-grid">
+          <div className="ob-hero-mark">
+            <KaimiMark size={300} />
+          </div>
+          <div>
+            <p className="ob-kicker">Recorrido de la demo</p>
+            <h1>Todo su cuidado, en un solo lugar.</h1>
+            <p className="ob-lead">
+              Kaimi reúne la historia clínica, los recordatorios y los servicios veterinarios cercanos. Esta guía te muestra todo lo que trae la
+              demo, paso a paso, en unos 10 minutos.
+            </p>
 
-          <div className="ob-access">
-            {demo === null ? (
-              <span className="spinner" />
-            ) : demo.enabled ? (
-              <>
-                {user ? (
-                  <p className="ob-status">
-                    <Icon name="check" size={18} /> {isDemoUser ? 'Estás dentro de la cuenta demo.' : `Sesión iniciada como ${user.name}.`}
-                  </p>
-                ) : (
-                  <button className="btn btn-primary btn-lg" onClick={() => enterDemo()} disabled={busy}>
-                    {busy ? 'Entrando…' : 'Entrar a la demo'}
-                  </button>
-                )}
-                <a className="btn btn-on-dark btn-lg" href="#recorrido">
-                  Empezar el recorrido
-                </a>
-                <p className="ob-creds">
-                  Cuenta demo: <strong>{demo.email}</strong>
-                  {demo.password && (
-                    <>
-                      {' '}
-                      · contraseña <strong>{demo.password}</strong>
-                    </>
+            <div className="ob-access">
+              {demo === null ? (
+                <span className="spinner" />
+              ) : demo.enabled ? (
+                <>
+                  {user ? (
+                    <p className="ob-status">
+                      <Icon name="check" size={18} /> {isDemoUser ? 'Estás dentro de la cuenta demo.' : `Sesión iniciada como ${user.name}.`}
+                    </p>
+                  ) : (
+                    <button className="btn btn-primary btn-lg" onClick={() => enterDemo()} disabled={busy}>
+                      {busy ? 'Entrando…' : 'Entrar a la demo'}
+                    </button>
                   )}
-                </p>
-              </>
-            ) : (
-              <>
-                <Link className="btn btn-primary btn-lg" to={user ? '/' : '/registro'}>
-                  {user ? 'Ir a la app' : 'Crear cuenta gratis'}
-                </Link>
-                <a className="btn btn-on-dark btn-lg" href="#recorrido">
-                  Ver el recorrido
-                </a>
-                <p className="ob-creds">La cuenta demo no está activa en este servidor (se activa con la variable SEED_DEMO=true).</p>
-              </>
-            )}
+                  <a className="btn btn-on-dark btn-lg" href="#recorrido">
+                    Empezar el recorrido
+                  </a>
+                  <p className="ob-creds">
+                    Cuenta demo: <strong>{demo.email}</strong>
+                    {demo.password && (
+                      <>
+                        {' '}
+                        · contraseña <strong>{demo.password}</strong>
+                      </>
+                    )}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <Link className="btn btn-primary btn-lg" to={user ? '/' : '/registro'}>
+                    {user ? 'Ir a la app' : 'Crear cuenta gratis'}
+                  </Link>
+                  <a className="btn btn-on-dark btn-lg" href="#recorrido">
+                    Ver el recorrido
+                  </a>
+                  <p className="ob-creds">La cuenta demo no está activa en este servidor (se activa con la variable SEED_DEMO=true).</p>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </section>

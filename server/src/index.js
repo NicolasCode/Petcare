@@ -13,7 +13,7 @@ if (process.env.SEED_DEMO === 'true') {
 }
 
 const server = createApp().listen(config.port, () => {
-  console.log(`KuraPet escuchando en el puerto ${config.port}`);
+  console.log(`Kaimi escuchando en el puerto ${config.port}`);
 });
 
 function shutdown() {

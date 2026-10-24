@@ -86,7 +86,7 @@ export default function SharedProfile() {
               );
             })}
             <p className="small muted center">
-              Información registrada por el propietario en KuraPet. No reemplaza la valoración clínica presencial.
+              Información registrada por el propietario en Kaimi. No reemplaza la valoración clínica presencial.
             </p>
           </div>
         )}

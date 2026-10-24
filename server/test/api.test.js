@@ -3,8 +3,8 @@ import { after, before, describe, test } from 'node:test';
 import request from 'supertest';
 
 process.env.NODE_ENV = 'test';
-process.env.DATABASE_URL = process.env.TEST_DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5432/kurapet_test';
-process.env.ADMIN_EMAILS = 'admin@kurapet.test';
+process.env.DATABASE_URL = process.env.TEST_DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5432/kaimi_test';
+process.env.ADMIN_EMAILS = 'admin@kaimi.test';
 
 const { pool } = await import('../src/db.js');
 const { migrate } = await import('../src/migrate.js');
@@ -61,8 +61,8 @@ describe('mascotas e historia clínica', () => {
   let petId;
 
   before(async () => {
-    owner = await signup('dueno@kurapet.test');
-    other = await signup('otro@kurapet.test');
+    owner = await signup('dueno@kaimi.test');
+    other = await signup('otro@kaimi.test');
   });
 
   test('crea una mascota y valida los datos', async () => {
@@ -178,8 +178,8 @@ describe('mascotas e historia clínica', () => {
 
 describe('directorio de lugares', () => {
   test('solo administradores gestionan; todos buscan por cercanía', async () => {
-    const user = await signup('vecino@kurapet.test');
-    const admin = await signup('admin@kurapet.test', 'Admin');
+    const user = await signup('vecino@kaimi.test');
+    const admin = await signup('admin@kaimi.test', 'Admin');
     assert.equal((await admin.get('/api/auth/me')).body.user.is_admin, true);
 
     const place = { name: 'Clínica Norte', kind: 'urgencias', open_24h: true, lat: 4.711, lng: -74.03 };
@@ -205,7 +205,7 @@ describe('datos de demostración', () => {
     await seedDemo({ password: 'demo-1234' }); // idempotente
 
     const agent = request.agent(app);
-    const login = await agent.post('/api/auth/login').send({ email: 'demo@kurapet.co', password: 'demo-1234' });
+    const login = await agent.post('/api/auth/login').send({ email: 'demo@kaimi.co', password: 'demo-1234' });
     assert.equal(login.status, 200);
 
     const { body } = await agent.get(`/api/dashboard?today=${today}`);
@@ -227,7 +227,7 @@ describe('datos de demostración', () => {
     process.env.SEED_DEMO = 'true';
     try {
       const info = await request(app).get('/api/auth/demo');
-      assert.equal(info.body.email, 'demo@kurapet.co');
+      assert.equal(info.body.email, 'demo@kaimi.co');
       const agent = request.agent(app);
       const res = await agent.post('/api/auth/demo');
       assert.equal(res.status, 200);

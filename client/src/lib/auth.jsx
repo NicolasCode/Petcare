@@ -12,8 +12,8 @@ export function AuthProvider({ children }) {
       .then((d) => setUser(d.user))
       .catch(() => setUser(null));
     const onUnauthorized = () => setUser(null);
-    window.addEventListener('kurapet:unauthorized', onUnauthorized);
-    return () => window.removeEventListener('kurapet:unauthorized', onUnauthorized);
+    window.addEventListener('kaimi:unauthorized', onUnauthorized);
+    return () => window.removeEventListener('kaimi:unauthorized', onUnauthorized);
   }, []);
 
   const login = useCallback(async (email, password) => {

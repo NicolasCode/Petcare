@@ -1,8 +1,8 @@
 {
-  "name": "kurapet",
+  "name": "kaimi",
   "private": true,
   "version": "1.0.0",
-  "description": "KuraPet: la historia clínica y el cuidado de tu mascota en un solo lugar",
+  "description": "Kaimi: la historia clínica y el cuidado de tu mascota en un solo lugar",
   "workspaces": [
     "server",
     "client"
