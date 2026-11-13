@@ -1,4 +1,7 @@
 import { Link } from 'react-router-dom';
+import { api } from '../../lib/api.js';
+import { waLink } from '../../lib/contact.js';
+import { useToast } from '../../lib/toast.jsx';
 import Icon from '../../components/Icon.jsx';
 import { Badge } from '../../components/RecordSection.jsx';
 import { EmptyState, Spinner } from '../../components/States.jsx';
@@ -15,7 +18,19 @@ const mailto = (f) =>
   )}`;
 
 export default function ClinicHome() {
-  const { place, counts } = useClinic();
+  const { place, counts, plan, whatsapp_enabled: waEnabled } = useClinic();
+  const toast = useToast();
+  // Pro: envío por la cuenta de WhatsApp de Kaimi. Gratis: abre el chat con el mensaje listo
+  const sendWhatsApp = async (f) => {
+    try {
+      await api.post(`/clinics/${place.id}/follow-ups/${f.id}/whatsapp`);
+      toast(`Recordatorio enviado a ${f.owner_name.split(' ')[0]}`);
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  };
+  const waText = (f) =>
+    `Hola ${f.owner_name.split(' ')[0]}, te escribimos de ${place.name}: ${f.pet_name} tiene pendiente ${f.name} (${formatDate(f.next_due)}). ¿Agendamos?`;
   const { data, loading } = useFetch(`/clinics/${place.id}/follow-ups?days=30`);
   const base = `/clinica/${place.id}`;
 
@@ -36,12 +51,29 @@ export default function ClinicHome() {
         </Link>
       </div>
 
+      {counts.appointment_requests > 0 && (
+        <Link to={`${base}/citas`} className="card urgent-card clinic-card">
+          <span className="urgent-icon">
+            <Icon name="calendar" />
+          </span>
+          <span>
+            <strong>
+              {counts.appointment_requests} {counts.appointment_requests === 1 ? 'solicitud de cita pendiente' : 'solicitudes de cita pendientes'}
+            </strong>
+            <span>Confírmalas con fecha y hora; le avisamos al dueño</span>
+          </span>
+          <Icon name="chevron" />
+        </Link>
+      )}
+
       <section className="card">
         <div className="card-head">
           <h2>
             <Icon name="clock" /> Próximos seguimientos
           </h2>
-          <span className="muted small">Vencidos y próximos 30 días</span>
+          <span className="muted small">
+            Vencidos y próximos 30 días{plan.whatsapp ? ' · WhatsApp automático 7 días y 1 día antes' : ''}
+          </span>
         </div>
         {loading && !data ? (
           <Spinner />
@@ -86,8 +118,18 @@ export default function ClinicHome() {
                   </div>
                   <Badge tone={tone(d)}>{d < 0 ? `Vencido ${relativeDays(d)}` : relativeDays(d)}</Badge>
                   <div className="follow-actions">
+                    {f.owner_phone &&
+                      (plan.whatsapp && waEnabled ? (
+                        <button className="btn btn-secondary btn-sm" onClick={() => sendWhatsApp(f)}>
+                          <Icon name="message" size={16} /> Enviar recordatorio por WhatsApp
+                        </button>
+                      ) : (
+                        <a className="btn btn-secondary btn-sm" href={waLink(f.owner_phone, waText(f))} target="_blank" rel="noreferrer">
+                          <Icon name="message" size={16} /> WhatsApp
+                        </a>
+                      ))}
                     <a className="btn btn-ghost btn-sm" href={mailto(f)}>
-                      <Icon name="message" size={16} /> Escribir al dueño
+                      <Icon name="message" size={16} /> Correo
                     </a>
                   </div>
                 </li>

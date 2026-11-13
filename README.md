@@ -18,22 +18,26 @@ Stack: **React 19 + Vite** (frontend) · **Node 22 + Express 5** (API) · **Post
 | Recordatorios | En la app, resumen diario por correo y notificaciones push: 7 días antes, el día anterior, el mismo día y 3 días después |
 | Familia | Varios cuidadores por mascota: ven y registran, no borran ni comparten |
 | Clínicas con acceso | El dueño vincula una clínica con su código o QR, autoriza el acceso y lo puede revocar |
+| Citas | Pide cita a una clínica aliada (motivo, fecha y horario preferidos); la clínica la confirma con fecha y hora y le llega el aviso |
+| WhatsApp | Autorización expresa para que las clínicas de sus mascotas le recuerden por WhatsApp; al retirarla se borra el celular |
 | Historia portable | Enlace temporal de solo lectura para cualquier veterinario |
 
 ### Directorio
-Público (`/directorio`, sin cuenta), con horario semanal y “abierto ahora” en hora de Colombia, especialidades, equipos, veterinarios independientes (con atención a domicilio), perfil público por clínica (`/clinicas/:id-nombre`, con metadatos para buscadores y WhatsApp, y `sitemap.xml`) y reseñas verificadas: solo se califica una consulta que la propia clínica registró o validó. **El orden es por distancia o nombre; ni el plan ni las reseñas cambian la posición** (hay una prueba que lo verifica).
+Público (`/directorio`, sin cuenta), con horario semanal y “abierto ahora” en hora de Colombia, aviso de “veterinario disponible ahora” que la clínica activa por 2, 4 u 8 horas y se apaga solo, especialidades, equipos, veterinarios independientes (con atención a domicilio), perfil público por clínica (`/clinicas/:id-nombre`, con metadatos para buscadores y WhatsApp, y `sitemap.xml`) y reseñas verificadas: solo se califica una consulta que la propia clínica registró o validó. **El orden es por distancia o nombre; ni el plan ni las reseñas cambian la posición** (hay una prueba que lo verifica).
 
 ### Para clínicas (`/clinica`)
-Pacientes (alta por enlace o QR imprimible con autorización del dueño), historia de cada paciente con registros validados por la clínica y validación de lo que ingresó el cuidador, próximos seguimientos con correo al dueño, perfil y horario editables, equipo con roles (admin, veterinario, recepción) y respuesta a reseñas.
+Pacientes (alta por enlace o QR imprimible con autorización del dueño), historia de cada paciente con registros validados por la clínica y validación de lo que ingresó el cuidador, solicitudes de cita, próximos seguimientos con WhatsApp o correo al dueño, disponibilidad temporal, perfil y horario editables, equipo con roles (admin, veterinario, recepción) y respuesta a reseñas.
+
+Cualquier veterinario o clínica pide su panel en **`/registrar-clinica`** (o reclama un lugar que ya está en el directorio desde su perfil público) y un administrador lo aprueba.
 
 ### Freemium
-Plan **Gratis** con todo lo anterior (hasta 5 personas en el equipo) y plan **Pro** marcado como “próximamente” (`server/src/plans.js`). El administrador del directorio asigna el plan. El plan nunca interviene en el orden del directorio.
+Plan **Gratis** con todo lo anterior (hasta 5 personas en el equipo). Plan **Pro** con reportes de vacunación, seguimiento y pacientes (exportables a CSV), recordatorios automáticos por WhatsApp 7 días y 1 día antes de cada refuerzo (solo a dueños que lo autorizaron) y equipos de hasta 50 personas (`server/src/plans.js`). La clínica solicita el plan desde su panel y un administrador lo activa cuando el pago está acordado (todavía no hay pasarela de pago). El plan nunca interviene en el orden del directorio.
 
 ### Administración
-Los correos en `ADMIN_EMAILS` crean y editan lugares, asignan el equipo de cada clínica desde su panel (ícono de equipo en “Cerca de mí”) y ocultan reseñas que incumplan las normas. Para activar una clínica: crea el lugar, pídele al veterinario que se registre y agrégalo como administrador en **Equipo**.
+Los correos en `ADMIN_EMAILS` ven **Administración** (`/admin`): aprueban o rechazan solicitudes de clínicas (con aviso por correo), activan planes, ven todos los lugares con su equipo y pacientes, y ocultan reseñas que incumplan las normas. También crean y editan lugares desde “Cerca de mí”.
 
 ### Fuera de alcance
-Funciones del plan Pro (WhatsApp automático, agenda en línea, reportes), marketplace (Fase 3) y teleorientación.
+Pasarela de pago del plan Pro, agenda con cupos reservables por el dueño, marketplace (Fase 3) y teleorientación.
 
 ## Desarrollo local
 
@@ -49,7 +53,7 @@ npm run dev                            # API en :3000 y web en http://localhost:
 
 Las migraciones (`server/migrations/*.sql`) se aplican solas al arrancar el servidor; también puedes correr `npm run migrate`.
 
-Pruebas de la API (usan la base `kaimi_test`, o `TEST_DATABASE_URL`, y **la borran**):
+Pruebas de la API (usan la base `kaimi_test`, o `TEST_DATABASE_URL`, y **la borran**). También corren en GitHub Actions (`.github/workflows/ci.yml`) junto con la compilación del frontend:
 
 ```bash
 createdb kaimi_test
@@ -73,6 +77,7 @@ La app es **un solo servicio**: el mismo contenedor compila el frontend y lo sir
    | `RESEND_API_KEY`, `MAIL_FROM` | para enviar correos (confirmación, recuperar contraseña, recordatorios). Sin ellas, los correos solo se escriben en el log |
    | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | para notificaciones push; genéralas con `npx web-push generate-vapid-keys` |
    | `APP_URL` | opcional: dominio propio para los enlaces de los correos (por defecto usa el dominio de Railway) |
+   | `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_TEMPLATE` | opcional: recordatorios por WhatsApp de las clínicas Pro con la Cloud API de Meta. La plantilla (aprobada por Meta) recibe nombre del dueño, mascota, cuidado, fecha y clínica |
 
 4. **Settings → Networking → Generate Domain**. El healthcheck es `/api/health`.
 
@@ -84,11 +89,13 @@ La app es **un solo servicio**: el mismo contenedor compila el frontend y lo sir
 Agrega la variable `SEED_DEMO=true` al servicio y deja que se redespliegue. Al arrancar se crean (o se reinician, con fechas frescas) dos cuentas con contraseña `kaimi-demo` (cámbiala con `DEMO_PASSWORD`):
 
 - **`demo@kaimi.co`**: dueño de Timothy y Luna con historia clínica completa (alergia grave, vacunas al día y vencidas, tratamiento en curso, cita próxima, curva de peso, alimento por acabarse, carné con QR).
-- **`clinica@kaimi.co`**: veterinaria y administradora de la Clínica Veterinaria Demo Chicó, con dos pacientes (Timothy y Rocky), registros validados, seguimientos pendientes y dos reseñas verificadas.
+- **`clinica@kaimi.co`**: veterinaria y administradora de la Clínica Veterinaria Demo Chicó (plan Pro), con dos pacientes (Timothy y Rocky), registros validados, una solicitud de cita pendiente, seguimientos, reportes, veterinario disponible y dos reseñas verificadas.
+
+Además deja una solicitud de clínica pendiente para revisar en `/admin` (entra con un correo de `ADMIN_EMAILS`).
 
 También carga 8 lugares ficticios con horarios en el mapa.
 
-Abre **`/onboard`** para el recorrido guiado: botones “Entrar a la demo” y “Entrar como clínica” de un clic, 13 pasos con enlaces directos a cada pantalla, guion de 3 minutos para presentar y alcance. El acceso de un clic solo existe mientras `SEED_DEMO=true`.
+Abre **`/onboard`** para el recorrido guiado: botones “Entrar a la demo” y “Entrar como clínica” de un clic, 14 pasos con enlaces directos a cada pantalla, guion de 3 minutos para presentar y alcance. El acceso de un clic solo existe mientras `SEED_DEMO=true`.
 
 Con `SEED_DEMO=true` la cuenta demo se reinicia en cada despliegue o reinicio; cuando termine la demo, bórrala o ponla en `false`. Localmente: `npm run seed:demo`.
 

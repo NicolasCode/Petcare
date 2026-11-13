@@ -29,6 +29,10 @@ const ClinicProfileEdit = lazy(() => import('./pages/clinic/ClinicProfileEdit.js
 const ClinicTeam = lazy(() => import('./pages/clinic/ClinicTeam.jsx'));
 const ClinicReviews = lazy(() => import('./pages/clinic/ClinicReviews.jsx'));
 const ClinicPlan = lazy(() => import('./pages/clinic/ClinicPlan.jsx'));
+const ClinicAppointments = lazy(() => import('./pages/clinic/ClinicAppointments.jsx'));
+const ClinicReports = lazy(() => import('./pages/clinic/ClinicReports.jsx'));
+const Admin = lazy(() => import('./pages/Admin.jsx'));
+const RegisterClinic = lazy(() => import('./pages/RegisterClinic.jsx'));
 
 const lazyPage = (el) => <Suspense fallback={<Spinner />}>{el}</Suspense>;
 
@@ -100,11 +104,15 @@ export default function App() {
         <Route path="vincular/:code" element={<LinkClinic />} />
         <Route path="cerca" element={lazyPage(<Places />)} />
         <Route path="cuenta" element={<Account />} />
+        <Route path="registrar-clinica" element={lazyPage(<RegisterClinic />)} />
+        <Route path="admin" element={lazyPage(<Admin />)} />
         <Route path="clinica" element={lazyPage(<ClinicIndex />)} />
         <Route path="clinica/:placeId" element={lazyPage(<ClinicLayout />)}>
           <Route index element={lazyPage(<ClinicHome />)} />
           <Route path="pacientes" element={lazyPage(<ClinicPatients />)} />
           <Route path="pacientes/:petId" element={lazyPage(<ClinicPatient />)} />
+          <Route path="citas" element={lazyPage(<ClinicAppointments />)} />
+          <Route path="reportes" element={lazyPage(<ClinicReports />)} />
           <Route path="registro" element={lazyPage(<ClinicIntake />)} />
           <Route path="perfil" element={lazyPage(<ClinicProfileEdit />)} />
           <Route path="equipo" element={lazyPage(<ClinicTeam />)} />

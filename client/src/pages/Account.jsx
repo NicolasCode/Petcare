@@ -76,6 +76,7 @@ export default function Account() {
           </span>
         </label>
         <PushToggle />
+        <WhatsAppOptIn />
       </section>
 
       {user.clinics?.length > 0 && (
@@ -111,10 +112,25 @@ export default function Account() {
           </h2>
         </div>
         <p className="muted">
-          El panel para clínicas es gratis: pacientes con QR, vacunas validadas, seguimientos y reseñas verificadas. Escríbenos a{' '}
-          <a href="mailto:hola@kaimi.co?subject=Quiero%20el%20panel%20de%20cl%C3%ADnica">hola@kaimi.co</a> para activarlo.
+          El panel para clínicas es gratis: pacientes con QR, vacunas validadas, solicitudes de cita, seguimientos y reseñas verificadas.
         </p>
+        <Link className="btn btn-secondary" to="/registrar-clinica">
+          <Icon name="clinic" size={18} /> Registrar mi clínica o consultorio
+        </Link>
       </section>
+
+      {user.is_admin && (
+        <Link className="card urgent-card clinic-card" to="/admin">
+          <span className="urgent-icon">
+            <Icon name="shield" />
+          </span>
+          <span>
+            <strong>Administración de Kaimi</strong>
+            <span>Solicitudes de clínicas, planes y moderación</span>
+          </span>
+          <Icon name="chevron" />
+        </Link>
+      )}
 
       <div className="stack">
         <button className="btn btn-secondary btn-block" onClick={() => setChanging(true)}>
@@ -206,6 +222,55 @@ function PushToggle() {
         <button className="btn btn-ghost btn-sm" onClick={test}>
           Enviar una prueba
         </button>
+      )}
+    </div>
+  );
+}
+
+// Recordatorios por WhatsApp de las clínicas aliadas: requiere autorización expresa
+function WhatsAppOptIn() {
+  const { user, setUser } = useAuth();
+  const toast = useToast();
+  const [phone, setPhone] = useState(user.phone ?? '');
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const save = async (optIn) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const d = await api.put('/auth/me', optIn ? { phone, whatsapp_opt_in: true } : { whatsapp_opt_in: false });
+      setUser(d.user);
+      if (!optIn) setPhone('');
+      toast(optIn ? 'Listo: las clínicas de tus mascotas podrán recordarte por WhatsApp' : 'Ya no recibirás WhatsApp de las clínicas');
+    } catch (err) {
+      setError(err.fields?.phone ?? err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="stack-sm whatsapp-optin">
+      <h3 className="subhead">WhatsApp de tus clínicas</h3>
+      {user.whatsapp_opt_in ? (
+        <>
+          <p className="small">
+            <Icon name="check" size={14} /> Las clínicas que atienden a tus mascotas pueden escribirte al <strong>{user.phone}</strong> para recordarte
+            vacunas y citas.
+          </p>
+          <button className="btn btn-ghost btn-sm" onClick={() => save(false)} disabled={busy}>
+            Dejar de recibir WhatsApp
+          </button>
+        </>
+      ) : (
+        <>
+          <p className="muted small">Autoriza a las clínicas con acceso a la historia de tus mascotas a recordarte por WhatsApp. Puedes retirarlo cuando quieras.</p>
+          <Field label="Celular" error={error}>
+            {(p) => <input type="tel" inputMode="tel" autoComplete="tel" {...p} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="300 123 4567" />}
+          </Field>
+          <button className="btn btn-secondary btn-sm" onClick={() => save(true)} disabled={busy || !phone.trim()}>
+            Autorizar recordatorios por WhatsApp
+          </button>
+        </>
       )}
     </div>
   );

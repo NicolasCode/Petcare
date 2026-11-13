@@ -1219,6 +1219,7 @@ textarea:focus {
   .tabs {
     margin: 0;
     padding: 0;
+    flex-wrap: wrap;
   }
 }
 .tab {
@@ -2528,4 +2529,192 @@ a.tab {
 }
 .place-actions .place-actions {
   display: contents;
+}
+
+/* ===== Agenda, disponibilidad, reportes y administración ===== */
+.tab-count-alert {
+  background: var(--danger);
+  color: #fff;
+}
+.stat-row-4 {
+  grid-template-columns: repeat(2, 1fr);
+}
+@media (min-width: 800px) {
+  .stat-row-4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+.row-between {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.request-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+.plan-cta {
+  margin-top: 16px;
+}
+
+/* Veterinario disponible: punto verde que pulsa solo si no se pidió reducir movimiento */
+.availability {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--line);
+  background: var(--surface);
+  font-size: 0.92rem;
+}
+.availability.is-on {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--ok) 40%, var(--line));
+  background: var(--ok-soft);
+}
+.availability > span:not(.availability-dot) {
+  flex: 1;
+  min-width: 180px;
+}
+.availability-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ink-3);
+  opacity: 0.5;
+}
+.is-on .availability-dot,
+.available-line .availability-dot {
+  background: var(--ok);
+  opacity: 1;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 25%, transparent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .is-on .availability-dot,
+  .available-line .availability-dot {
+    animation: pulse 2s ease-in-out infinite;
+  }
+}
+@keyframes pulse {
+  50% {
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--ok) 10%, transparent);
+  }
+}
+.available-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--ok);
+}
+
+/* Barras horizontales de los reportes (una serie, valor visible, tooltip y tabla) */
+.barlist {
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+.barlist figcaption {
+  font-weight: 800;
+}
+.barlist ul {
+  display: grid;
+  gap: 8px;
+}
+.barlist-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(80px, 34%) 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 4px;
+  border-radius: 8px;
+  outline-offset: 2px;
+}
+.barlist-row:hover,
+.barlist-row:focus-visible {
+  background: var(--surface-2);
+}
+.barlist-label {
+  font-size: 0.88rem;
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.barlist-track {
+  height: 12px;
+  border-radius: 4px;
+  background: var(--surface-2);
+}
+.barlist-bar {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: 0 4px 4px 0;
+  background: var(--brand);
+}
+.barlist-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 0.88rem;
+  min-width: 3ch;
+  text-align: right;
+}
+.barlist-tip {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 4px);
+  z-index: 2;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--ink);
+  color: var(--bg);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.barlist-row:hover .barlist-tip,
+.barlist-row:focus-visible .barlist-tip {
+  opacity: 1;
+}
+.barlist-table summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--ink-3);
+}
+.barlist-table table,
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.barlist-table th,
+.barlist-table td,
+.data-table th,
+.data-table td {
+  text-align: left;
+  padding: 6px 8px 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+.data-table th {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.data-table select {
+  width: auto;
+  padding: 4px 8px;
+}
+.whatsapp-optin {
+  margin-top: 8px;
 }

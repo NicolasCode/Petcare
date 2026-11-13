@@ -97,7 +97,7 @@ export default function Carne() {
           {history.length === 0 ? (
             <p className="muted">Sin vacunas registradas.</p>
           ) : (
-            <div className="table-wrap">
+            <div className="table-wrap" tabIndex={0} role="region" aria-label="Tabla de vacunas">
               <table className="carne-table">
                 <thead>
                   <tr>

@@ -30,6 +30,9 @@ export function formatTime(hhmm) {
   return new Date(2000, 0, 1, h, m).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' });
 }
 
+// Hora de un instante en Colombia (los avisos de las clínicas se leen en su hora local)
+export const bogotaTime = (iso) => new Date(iso).toLocaleTimeString('es-CO', { timeZone: 'America/Bogota', hour: 'numeric', minute: '2-digit' });
+
 // Estado del horario que calcula el servidor en hora de Colombia
 export function openText(status, open24h) {
   if (!status || status.open === null) return null;

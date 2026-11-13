@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
-import { formatDate, PLACE_KINDS, placeUrl } from '../lib/format.js';
+import { formatDate, formatDateTime, PLACE_KINDS, placeUrl } from '../lib/format.js';
 import { resizeImage } from '../lib/image.js';
 import { useToast } from '../lib/toast.jsx';
 import { useFetch } from '../lib/useFetch.js';
@@ -10,6 +10,11 @@ import { Field, FormError } from './Field.jsx';
 import Icon from './Icon.jsx';
 import Modal, { ConfirmModal } from './Modal.jsx';
 import PetAvatar from './PetAvatar.jsx';
+import { Badge } from './RecordSection.jsx';
+import RequestAppointment from './RequestAppointment.jsx';
+import ConsentText from './ConsentText.jsx';
+
+export { ConsentText };
 
 // Avatar que abre el selector de foto (cámara en el celular)
 export function PetPhoto({ pet, size = 72, onChange }) {
@@ -48,6 +53,8 @@ export function ClinicsPanel({ pet, clinics, isOwner, onChange }) {
   const toast = useToast();
   const [linking, setLinking] = useState(false);
   const [revoking, setRevoking] = useState(null);
+  const [requesting, setRequesting] = useState(null);
+  const { data: reqData, reload: reloadRequests } = useFetch(`/pets/${pet.id}/appointment-requests`);
   const [code, setCode] = useState('');
   const [consent, setConsent] = useState(false);
   const [error, setError] = useState(null);
@@ -133,14 +140,31 @@ export function ClinicsPanel({ pet, clinics, isOwner, onChange }) {
                   {PLACE_KINDS[c.kind]?.label} · autorizada el {formatDate(c.consented_at.slice(0, 10))}
                 </span>
               </span>
-              {isOwner && (
-                <button className="btn btn-ghost btn-sm" onClick={() => setRevoking(c)}>
-                  Quitar acceso
+              <span className="row-actions">
+                <button className="btn btn-secondary btn-sm" onClick={() => setRequesting(c)}>
+                  <Icon name="calendar" size={16} /> Pedir cita
                 </button>
-              )}
+                {isOwner && (
+                  <button className="btn btn-ghost btn-sm" onClick={() => setRevoking(c)}>
+                    Quitar acceso
+                  </button>
+                )}
+              </span>
             </li>
           ))}
         </ul>
+      )}
+
+      <AppointmentRequests pet={pet} requests={reqData?.requests ?? []} onChange={reloadRequests} />
+      {requesting && (
+        <RequestAppointment
+          place={{ id: requesting.place_id, name: requesting.name }}
+          pet={pet}
+          linked
+          open
+          onClose={() => setRequesting(null)}
+          onSent={reloadRequests}
+        />
       )}
 
       <Modal open={linking} onClose={() => setLinking(false)} title="Vincular una clínica">
@@ -171,16 +195,54 @@ export function ClinicsPanel({ pet, clinics, isOwner, onChange }) {
   );
 }
 
-// Autorización explícita (Ley 1581) que se muestra al vincular una clínica
-export function ConsentText({ pet, checked, onChange, clinicName = 'la clínica' }) {
+const REQUEST_STATUS = {
+  pendiente: { tone: 'warning', text: 'Esperando confirmación' },
+  confirmada: { tone: 'ok', text: 'Confirmada' },
+  rechazada: { tone: 'neutral', text: 'No se pudo agendar' },
+  cancelada: { tone: 'neutral', text: 'Cancelada' },
+};
+
+// Solicitudes de cita recientes y su estado
+function AppointmentRequests({ pet, requests, onChange }) {
+  const toast = useToast();
+  const recent = requests.filter((r) => r.status === 'pendiente' || Date.now() - new Date(r.created_at) < 30 * 86400000);
+  if (!recent.length) return null;
+  const cancel = async (r) => {
+    try {
+      await api.post(`/pets/${pet.id}/appointment-requests/${r.id}/cancel`);
+      toast('Solicitud cancelada');
+      onChange();
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  };
   return (
-    <label className="check consent">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-      <span>
-        Autorizo a {clinicName} a consultar la historia clínica de {pet?.name ?? 'mi mascota'} y a registrar vacunas, controles y consultas. La clínica verá mi
-        nombre y mi correo para hacer seguimiento. Puedo quitar este acceso cuando quiera (Ley 1581 de 2012).
-      </span>
-    </label>
+    <>
+      <h3 className="subhead">Solicitudes de cita</h3>
+      <ul className="link-list">
+        {recent.map((r) => (
+          <li key={r.id}>
+            <span>
+              <strong>
+                {r.reason} · {r.place_name}
+              </strong>
+              <span className="muted small">
+                {r.scheduled_at ? `Cita: ${formatDateTime(r.scheduled_at)}` : `Pedida el ${formatDate(r.created_at.slice(0, 10))}`}
+                {r.response ? ` · ${r.response}` : ''}
+              </span>
+            </span>
+            <span className="row-actions">
+              <Badge tone={REQUEST_STATUS[r.status].tone}>{REQUEST_STATUS[r.status].text}</Badge>
+              {r.status === 'pendiente' && (
+                <button className="btn btn-ghost btn-sm" onClick={() => cancel(r)}>
+                  Cancelar
+                </button>
+              )}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 

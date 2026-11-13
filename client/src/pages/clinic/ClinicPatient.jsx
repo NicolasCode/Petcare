@@ -5,6 +5,7 @@ import ProfileSummary from '../../components/ProfileSummary.jsx';
 import RecordSection, { RecordItem } from '../../components/RecordSection.jsx';
 import { ErrorState, Spinner } from '../../components/States.jsx';
 import WeightChart from '../../components/WeightChart.jsx';
+import { telLink } from '../../lib/contact.js';
 import { formatDate, petSummary } from '../../lib/format.js';
 import { RECORD_TYPES } from '../../lib/records.js';
 import { useFetch } from '../../lib/useFetch.js';
@@ -49,7 +50,14 @@ export default function ClinicPatient() {
             </p>
           )}
           <p className="small muted">
-            Dueño/a: {link.owner_name} · <a href={`mailto:${link.owner_email}`}>{link.owner_email}</a> · autorizó el {formatDate(link.consented_at.slice(0, 10))}
+            Dueño/a: {link.owner_name} · <a href={`mailto:${link.owner_email}`}>{link.owner_email}</a>
+            {link.owner_phone && (
+              <>
+                {' '}
+                · <a href={telLink(link.owner_phone)}>{link.owner_phone}</a>
+              </>
+            )}{' '}
+            · autorizó el {formatDate(link.consented_at.slice(0, 10))}
           </p>
         </div>
       </header>

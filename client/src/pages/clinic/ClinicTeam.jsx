@@ -97,7 +97,7 @@ export default function ClinicTeam() {
                 <strong>
                   {m.display_name} <Badge tone={m.role === 'admin' ? 'info' : 'neutral'}>{ROLES[m.role]}</Badge>
                 </strong>
-                <span className="muted small">{[m.email, m.specialty, m.professional_card && `TP ${m.professional_card}`].filter(Boolean).join(' · ')}</span>
+                <span className="muted small">{[m.email, m.specialty, m.professional_card && `Tarjeta ${m.professional_card}`].filter(Boolean).join(' · ')}</span>
               </span>
               <span className="row-actions">
                 {(isAdmin || m.user_id === user.id) && (

@@ -12,7 +12,7 @@ import { EmptyState, ErrorState, Spinner } from '../components/States.jsx';
 import { RatingSummary } from '../components/Stars.jsx';
 import { ApiError, api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
-import { PLACE_KINDS, openText, placeUrl, tags } from '../lib/format.js';
+import { PLACE_KINDS, bogotaTime, openText, placeUrl, tags } from '../lib/format.js';
 import { useToast } from '../lib/toast.jsx';
 import { useFetch } from '../lib/useFetch.js';
 
@@ -61,6 +61,7 @@ export default function Places() {
     if (kind) p.set('kind', kind);
     if (params.get('24h') === '1') p.set('open24h', 'true');
     if (params.get('abierto') === '1') p.set('openNow', 'true');
+    if (params.get('vet') === '1') p.set('vetNow', 'true');
     if (search) p.set('q', search);
     return `/places?${p}`;
   }, [coords, kind, params, search]);
@@ -124,6 +125,9 @@ export default function Places() {
         ))}
         <button className={`chip${params.get('abierto') === '1' ? ' active' : ''}`} aria-pressed={params.get('abierto') === '1'} onClick={() => setFilter('abierto', params.get('abierto') === '1' ? '' : '1')}>
           <Icon name="check" size={14} /> Abierto ahora
+        </button>
+        <button className={`chip${params.get('vet') === '1' ? ' active' : ''}`} aria-pressed={params.get('vet') === '1'} onClick={() => setFilter('vet', params.get('vet') === '1' ? '' : '1')}>
+          <Icon name="stethoscope" size={14} /> Vet disponible
         </button>
         <button className={`chip${params.get('24h') === '1' ? ' active' : ''}`} aria-pressed={params.get('24h') === '1'} onClick={() => setFilter('24h', params.get('24h') === '1' ? '' : '1')}>
           <Icon name="clock" size={14} /> 24 horas
@@ -192,6 +196,7 @@ export default function Places() {
                   <div className="place-badges">
                     <Badge tone={p.kind === 'urgencias' ? 'danger' : 'neutral'}>{PLACE_KINDS[p.kind].label}</Badge>
                     {open && <Badge tone={open.tone}>{open.text}</Badge>}
+                    {p.available_until && <AvailableBadge place={p} />}
                     {p.home_visits && <Badge tone="info">A domicilio</Badge>}
                     {p.on_kaimi && (
                       <Badge tone="info">
@@ -266,6 +271,16 @@ export default function Places() {
         </>
       )}
     </div>
+  );
+}
+
+// Aviso temporal de la clínica; el servidor ya oculta los vencidos
+export function AvailableBadge({ place }) {
+  const until = bogotaTime(place.available_until);
+  return (
+    <Badge tone="ok">
+      <Icon name="stethoscope" size={12} /> Vet disponible hasta las {until}
+    </Badge>
   );
 }
 

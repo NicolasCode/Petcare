@@ -126,7 +126,11 @@ const STEPS = [
       'Toca “Ya no aplica” en otro refuerzo y reactívalo desde “Atendidos”.',
       'Usa Llamar o WhatsApp de la clínica responsable.',
     ],
-    notice: ['La cita de control la registró la clínica: ella la cerrará como atendida.', 'En Citas, la consulta pasada permite calificar la atención (reseña verificada).'],
+    notice: [
+      'La cita de control la registró la clínica: ella la cerrará como atendida.',
+      'En Citas, la consulta pasada permite calificar la atención (reseña verificada).',
+      'En “Clínica responsable”, “Pedir cita” envía la solicitud; la clínica la confirma con fecha y hora.',
+    ],
   },
   {
     icon: 'share',
@@ -153,6 +157,22 @@ const STEPS = [
     notice: [
       'Cada lugar muestra si está abierto ahora, especialidades, reseñas verificadas y su perfil público (también sin cuenta en /directorio).',
       'El orden es solo por distancia: ningún plan compra posición. Los 8 lugares de la demo son ficticios.',
+    ],
+  },
+  {
+    icon: 'clinic',
+    title: 'El lado de la clínica',
+    to: () => '/clinica',
+    cta: 'Abrir panel',
+    doThis: [
+      'Entra con “Entrar como clínica” (arriba) o como clinica@kaimi.co.',
+      'En Citas, confirma la solicitud de Rocky con fecha y hora.',
+      'En Inicio, envía un recordatorio por WhatsApp; en Reportes, mira la cobertura de vacunación y descarga el CSV.',
+      'Apaga y vuelve a encender “Veterinario disponible” y mira cómo cambia en el directorio.',
+    ],
+    notice: [
+      'Los pacientes llegan por el QR de la clínica, con autorización del dueño.',
+      'Lo que registra la veterinaria queda validado con su nombre y tarjeta profesional.',
     ],
   },
   {
@@ -206,6 +226,10 @@ const SCRIPT = [
 ];
 
 const NOW = [
+  'Solicitudes de cita a las clínicas, confirmadas con fecha y hora',
+  '“Veterinario disponible ahora” que se apaga solo, para que nunca quede viejo',
+  'Plan Pro: reportes de vacunación con CSV y recordatorios por WhatsApp',
+  'Registro de clínicas y veterinarios con aprobación y panel de administración',
   'Perfil 360° con foto, carné digital imprimible y QR de emergencia',
   'Vacunas con lote, vencimiento y médico; registros del cuidador vs. validados por clínica',
   'Seguimiento: marcar refuerzos y citas como atendidos, contacto con la clínica',
@@ -216,7 +240,8 @@ const NOW = [
   'Recuperar contraseña, confirmación de correo y Ley 1581',
 ];
 const NEXT = [
-  'Plan Pro para clínicas: recordatorios por WhatsApp, agenda en línea y reportes',
+  'Pago en línea del plan Pro',
+  'Agenda con cupos que el dueño reserva directamente',
   'Marketplace de farmacia y alimento con compra en un clic (Fase 3)',
   'Teleorientación y adjuntar exámenes',
 ];

@@ -43,6 +43,8 @@ export default function Layout({ children }) {
   const { user } = useAuth();
   // Quien trabaja en una clínica ve su panel en la navegación
   const nav = user.clinics?.length ? [...NAV.slice(0, 3), { to: '/clinica', label: 'Mi clínica', short: 'Clínica', icon: 'clinic' }, NAV[3]] : NAV;
+  // La administración va solo en la barra lateral para no saturar la de móvil
+  const sideNav = user.is_admin ? [...nav, { to: '/admin', label: 'Administración', icon: 'shield' }] : nav;
   return (
     <div className="app-shell">
       <a href="#main" className="skip-link">
@@ -51,7 +53,7 @@ export default function Layout({ children }) {
       <aside className="sidebar">
         <Logo />
         <nav aria-label="Principal">
-          {nav.map((item) => (
+          {sideNav.map((item) => (
             <NavLink key={item.to} to={item.to} end={item.end} className="side-link">
               <Icon name={item.icon} />
               {item.label}

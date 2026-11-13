@@ -5,12 +5,13 @@ import Icon from '../components/Icon.jsx';
 import Modal from '../components/Modal.jsx';
 import { ConsentText } from '../components/PetPanels.jsx';
 import PublicShell from '../components/PublicShell.jsx';
+import RequestAppointment from '../components/RequestAppointment.jsx';
 import { Badge } from '../components/RecordSection.jsx';
 import Stars, { RatingSummary } from '../components/Stars.jsx';
 import { ErrorState, Spinner } from '../components/States.jsx';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
-import { PLACE_KINDS, SPECIES, WEEKDAYS, formatDate, formatTime, openText, tags } from '../lib/format.js';
+import { PLACE_KINDS, SPECIES, WEEKDAYS, formatDate, formatTime, bogotaTime, openText, placeUrl, tags } from '../lib/format.js';
 import { useToast } from '../lib/toast.jsx';
 import { useFetch } from '../lib/useFetch.js';
 
@@ -41,6 +42,7 @@ export default function ClinicProfile() {
   const { user } = useAuth();
   const { data, error, loading, reload } = useFetch(placeId ? `/places/${placeId}` : null);
   const [linking, setLinking] = useState(false);
+  const [requesting, setRequesting] = useState(false);
 
   useEffect(() => {
     if (data?.place) document.title = `${data.place.name} · Kaimi`;
@@ -69,6 +71,14 @@ export default function ClinicProfile() {
             )}
           </div>
           <h1>{p.name}</h1>
+          {p.available_until && (
+            <p className="available-line">
+              <span className="availability-dot" aria-hidden="true" />
+              <strong>Veterinario disponible ahora</strong> · hasta las{' '}
+              {bogotaTime(p.available_until)}
+              {p.available_note && <span className="muted"> · {p.available_note}</span>}
+            </p>
+          )}
           <p className="muted">{[p.address, p.locality, p.city].filter(Boolean).join(' · ')}</p>
           <RatingSummary avg={p.rating_avg} count={p.rating_count} />
           {p.description && <p>{p.description}</p>}
@@ -85,11 +95,26 @@ export default function ClinicProfile() {
               </a>
             )}
             {p.on_kaimi && user && (
-              <button className="btn btn-primary btn-sm" onClick={() => setLinking(true)}>
-                <Icon name="link" size={16} /> Vincular a mi mascota
-              </button>
+              <>
+                <button className="btn btn-primary btn-sm" onClick={() => setRequesting(true)}>
+                  <Icon name="calendar" size={16} /> Pedir cita
+                </button>
+                <button className="btn btn-secondary btn-sm" onClick={() => setLinking(true)}>
+                  <Icon name="link" size={16} /> Vincular a mi mascota
+                </button>
+              </>
+            )}
+            {p.on_kaimi && !user && (
+              <Link className="btn btn-primary btn-sm" to="/ingresar" state={{ from: placeUrl(p) }}>
+                <Icon name="calendar" size={16} /> Ingresa para pedir cita
+              </Link>
             )}
           </div>
+          {!p.on_kaimi && p.kind !== 'farmacia' && (
+            <p className="small muted">
+              ¿Trabajas aquí? <Link to={`/registrar-clinica?lugar=${p.id}`}>Reclama este perfil</Link> para editarlo, recibir pacientes y solicitudes de cita.
+            </p>
+          )}
         </section>
 
         <div className="profile-grid">
@@ -189,6 +214,7 @@ export default function ClinicProfile() {
           )}
         </section>
         <LinkPetModal place={p} open={linking} onClose={() => setLinking(false)} />
+        {requesting && <RequestAppointment place={p} open onClose={() => setRequesting(false)} />}
       </div>
     );
   }
