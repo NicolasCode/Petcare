@@ -62,6 +62,8 @@ npm test
 
 ## Despliegue en Railway
 
+> Guía completa paso a paso (correo, push, WhatsApp, dominio, verificación y solución de problemas): **[docs/DEPLOY_RAILWAY.md](docs/DEPLOY_RAILWAY.md)**. Abajo, el resumen.
+
 La app es **un solo servicio**: el mismo contenedor compila el frontend y lo sirve junto a la API (mismo dominio, así funcionan la cookie de sesión y las rutas `/api`). No crees un servicio aparte para `client/`.
 
 1. **New Project → Deploy from GitHub repo** y elige este repositorio. Deja **Root Directory** vacío (raíz del repo): Railway lee `railway.json` y construye con el `Dockerfile`.
