@@ -3,8 +3,9 @@ import { config } from './config.js';
 import { query } from './db.js';
 import { bogotaClock } from './hours.js';
 import { renderMail, sendMail } from './mailer.js';
-import { getReminders } from './reminders.js';
+import { getClinicFollowUps, getReminders } from './reminders.js';
 import { bogotaTodayIso } from './validation.js';
+import { sendWhatsAppReminder, whatsappEnabled, whatsappParams } from './whatsapp.js';
 
 export const pushEnabled = () => Boolean(config.vapid.publicKey && config.vapid.privateKey);
 
@@ -89,10 +90,40 @@ export async function runDailyDigest(now = new Date()) {
   return notified;
 }
 
+// Clínicas Pro: WhatsApp a los dueños que lo autorizaron, 7 días antes y el día anterior de cada refuerzo
+export async function runClinicWhatsApp(now = new Date()) {
+  if (!whatsappEnabled()) return 0;
+  const today = bogotaTodayIso(now);
+  const { rows: places } = await query(`SELECT id, name FROM places WHERE plan = 'pro' AND EXISTS (SELECT 1 FROM place_members m WHERE m.place_id = places.id)`);
+  let sent = 0;
+  for (const place of places) {
+    const { preventive } = await getClinicFollowUps(place.id, today, 7);
+    for (const f of preventive) {
+      const days = dayDiff(today, f.next_due);
+      if (!f.owner_phone || (days !== 7 && days !== 1)) continue;
+      // Una sola vez por cuidado y etapa, aunque el dueño tenga varias clínicas o haya varias instancias
+      const { rows } = await query('INSERT INTO notification_log (user_id, key) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING key', [
+        f.owner_id,
+        `wa-auto:${f.id}:${days}`,
+      ]);
+      if (!rows[0]) continue;
+      try {
+        await sendWhatsAppReminder(f.owner_phone, whatsappParams(f, place));
+        sent++;
+      } catch (err) {
+        console.error('Error enviando WhatsApp', err.message);
+      }
+    }
+  }
+  return sent;
+}
+
 // Revisa cada hora; el resumen sale a partir de las 8 a. m. de Colombia
 export function startScheduler() {
   const tick = () => {
-    if (bogotaClock().minutes >= 8 * 60) runDailyDigest().catch((err) => console.error('Error en el resumen diario', err));
+    if (bogotaClock().minutes < 8 * 60) return;
+    runDailyDigest().catch((err) => console.error('Error en el resumen diario', err));
+    runClinicWhatsApp().catch((err) => console.error('Error en los WhatsApp de clínicas', err));
   };
   setTimeout(tick, 30_000).unref();
   setInterval(tick, 60 * 60 * 1000).unref();

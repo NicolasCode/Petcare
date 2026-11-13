@@ -3,10 +3,11 @@ import { z } from 'zod';
 import { query } from '../db.js';
 import { HttpError, notFound } from '../errors.js';
 import { renderMail, sendMailSafe } from '../mailer.js';
+import { notifyClinic } from '../notify.js';
 import { config } from '../config.js';
 import { PET_ACCESS, PET_SELECT, getPetProfile, petClinics } from '../profile.js';
 import { randomToken } from '../tokens.js';
-import { id, insertSql, optDate, optId, optPositive, optText, reqText, todayIso, updateSql } from '../validation.js';
+import { bogotaTodayIso, id, insertSql, optDate, optId, optPositive, optText, reqText, todayIso, updateSql } from '../validation.js';
 import recordsRouter from './records.js';
 import shareRouter from './share.js';
 
@@ -220,6 +221,66 @@ router.delete('/:petId/clinics/:placeId', ownerOnly, async (req, res) => {
     placeId.data,
   ]);
   if (!rowCount) throw notFound('Clínica');
+  res.status(204).end();
+});
+
+// ===== Solicitudes de cita a una clínica aliada =====
+router.get('/:petId/appointment-requests', async (req, res) => {
+  const { rows } = await query(
+    `SELECT ar.id, ar.place_id, ar.reason, ar.preferred_date, ar.preferred_time, ar.notes, ar.status, ar.response, ar.created_at,
+            pl.name AS place_name, a.scheduled_at
+     FROM appointment_requests ar JOIN places pl ON pl.id = ar.place_id LEFT JOIN appointments a ON a.id = ar.appointment_id
+     WHERE ar.pet_id = $1 ORDER BY ar.created_at DESC LIMIT 20`,
+    [req.pet.id],
+  );
+  res.json({ requests: rows });
+});
+
+// Pedir cita autoriza a la clínica a ver la historia (si aún no tenía acceso, solo el dueño puede darlo)
+router.post('/:petId/appointment-requests', async (req, res) => {
+  const data = z
+    .object({
+      place_id: id,
+      reason: reqText(150),
+      preferred_date: optDate.refine((v) => !v || v >= bogotaTodayIso(), 'Elige una fecha desde hoy'),
+      preferred_time: z.enum(['manana', 'tarde', 'cualquiera']).default('cualquiera'),
+      notes: optText(500),
+      consent: z.boolean().default(false),
+    })
+    .parse(req.body);
+  const { rows: places } = await query(
+    `SELECT pl.id, pl.name, EXISTS (SELECT 1 FROM clinic_patients cp WHERE cp.place_id = pl.id AND cp.pet_id = $2 AND cp.revoked_at IS NULL) AS linked
+     FROM places pl WHERE pl.id = $1 AND EXISTS (SELECT 1 FROM place_members m WHERE m.place_id = pl.id)`,
+    [data.place_id, req.pet.id],
+  );
+  const place = places[0];
+  if (!place) throw new HttpError(404, 'Esta clínica todavía no recibe solicitudes en Kaimi');
+  if (!place.linked) {
+    if (!req.isPetOwner) throw new HttpError(403, 'Solo el dueño puede autorizar a una clínica nueva');
+    if (!data.consent) return res.status(400).json({ error: 'Debes autorizar el acceso de la clínica', fields: { consent: 'Debes autorizar el acceso de la clínica' } });
+    await query("INSERT INTO clinic_patients (place_id, pet_id, granted_by, via) VALUES ($1, $2, $3, 'dueno')", [place.id, req.pet.id, req.userId]);
+  }
+  const { rows: open } = await query("SELECT 1 FROM appointment_requests WHERE place_id = $1 AND pet_id = $2 AND status = 'pendiente'", [place.id, req.pet.id]);
+  if (open[0]) throw new HttpError(409, `Ya hay una solicitud pendiente con ${place.name}`);
+  const { consent, ...request } = data;
+  const { rows } = await query(insertSql('appointment_requests', request, { pet_id: req.pet.id, user_id: req.userId }));
+  await notifyClinic(place.id, {
+    subject: `Solicitud de cita: ${req.pet.name}`,
+    title: `${req.user.name} pide una cita para ${req.pet.name}`,
+    lines: [`Motivo: ${data.reason}.`, 'Confírmala con fecha y hora desde el panel de la clínica.'],
+    path: `/clinica/${place.id}/citas`,
+  });
+  res.status(201).json({ request: rows[0] });
+});
+
+router.post('/:petId/appointment-requests/:requestId/cancel', async (req, res) => {
+  const requestId = id.safeParse(req.params.requestId);
+  if (!requestId.success) throw notFound('Solicitud');
+  const { rowCount } = await query(
+    "UPDATE appointment_requests SET status = 'cancelada', responded_at = now() WHERE id = $1 AND pet_id = $2 AND status = 'pendiente'",
+    [requestId.data, req.pet.id],
+  );
+  if (!rowCount) throw notFound('Solicitud');
   res.status(204).end();
 });
 

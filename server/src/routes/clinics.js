@@ -5,10 +5,12 @@ import { query, withTransaction } from '../db.js';
 import { HttpError, notFound } from '../errors.js';
 import { hoursSchema, listHours, openStatus, saveHours } from '../hours.js';
 import { PLANS, planOf } from '../plans.js';
+import { notifyUser } from '../notify.js';
 import { getPetProfile, publicPet } from '../profile.js';
 import { getClinicFollowUps } from '../reminders.js';
 import { randomToken } from '../tokens.js';
 import { bogotaTodayIso, id, insertSql, optText, updateSql } from '../validation.js';
+import { sendWhatsAppReminder, whatsappEnabled, whatsappParams } from '../whatsapp.js';
 import { placeProfileSchema } from './places.js';
 import { RECORD_TYPES, getRecord } from './records.js';
 
@@ -49,6 +51,12 @@ function requireClinician(req, res, next) {
   next();
 }
 
+// Funciones del plan Pro
+const requireFeature = (feature) => (req, res, next) => {
+  if (!planOf(req.place)[feature]) throw new HttpError(402, 'Esta función es del plan Pro. Puedes solicitarlo desde la pestaña Plan.');
+  next();
+};
+
 // Copia del validador: el registro sigue siendo legible aunque la persona deje la clínica
 const stamp = (member, place) => ({
   validated_at: new Date(),
@@ -70,17 +78,25 @@ router.get('/:placeId', async (req, res) => {
     query(
       `SELECT (SELECT count(*)::int FROM clinic_patients WHERE place_id = $1 AND revoked_at IS NULL) AS patients,
               (SELECT count(*)::int FROM place_members WHERE place_id = $1) AS members,
-              (SELECT count(*)::int FROM reviews WHERE place_id = $1 AND hidden_at IS NULL) AS reviews`,
+              (SELECT count(*)::int FROM reviews WHERE place_id = $1 AND hidden_at IS NULL) AS reviews,
+              (SELECT count(*)::int FROM appointment_requests WHERE place_id = $1 AND status = 'pendiente') AS appointment_requests,
+              (SELECT plan FROM plan_requests WHERE place_id = $1 AND status = 'pendiente') AS pending_plan`,
       [place.id],
     ),
   ]);
   const h = hours.get(place.id) ?? [];
   res.json({
-    place: { ...place, hours: h, status: openStatus(h, place.open_24h) },
+    place: {
+      ...place,
+      hours: h,
+      status: openStatus(h, place.open_24h),
+      available_until: place.available_until > new Date() ? place.available_until : null,
+    },
     member: { role: req.member.role, display_name: req.member.display_name, site_admin: Boolean(req.member.site_admin) },
     counts: counts.rows[0],
     plan: { id: place.plan, ...planOf(place) },
     plans: PLANS,
+    whatsapp_enabled: whatsappEnabled(),
   });
 });
 
@@ -92,6 +108,31 @@ router.put('/:placeId/profile', requireRole('admin'), async (req, res) => {
     return rows[0];
   });
   res.json({ place });
+});
+
+// "Veterinario disponible ahora": se apaga solo al vencer, así nunca queda un dato viejo
+router.put('/:placeId/availability', async (req, res) => {
+  if (req.member.site_admin) throw new HttpError(403, 'Solo el equipo de la clínica puede indicar su disponibilidad');
+  const data = z.object({ hours: z.union([z.literal(0), z.literal(2), z.literal(4), z.literal(8), z.literal(12)]), note: optText(120) }).parse(req.body);
+  const { rows } = await query(
+    `UPDATE places SET available_until = CASE WHEN $1::int = 0 THEN NULL ELSE now() + make_interval(hours => $1::int) END,
+       available_note = CASE WHEN $1::int = 0 THEN NULL ELSE $2 END
+     WHERE id = $3 RETURNING available_until, available_note`,
+    [data.hours, data.note, req.place.id],
+  );
+  res.json(rows[0]);
+});
+
+// Pasar al plan Pro (lo aprueba un administrador de Kaimi; el cobro se acuerda por fuera)
+router.post('/:placeId/plan-request', requireRole('admin'), async (req, res) => {
+  const { plan } = z.object({ plan: z.enum(Object.keys(PLANS)) }).parse(req.body);
+  if (plan === req.place.plan) throw new HttpError(400, `Ya tienes el plan ${PLANS[plan].label}`);
+  await query(
+    `INSERT INTO plan_requests (place_id, user_id, plan) VALUES ($1, $2, $3)
+     ON CONFLICT (place_id) WHERE status = 'pendiente' DO UPDATE SET plan = EXCLUDED.plan, user_id = EXCLUDED.user_id, created_at = now()`,
+    [req.place.id, req.userId, plan],
+  );
+  res.status(201).json({ pending_plan: plan });
 });
 
 // Un código nuevo invalida los QR impresos anteriores
@@ -205,7 +246,8 @@ router.param('petId', async (req, res, next, value) => {
   const petId = id.safeParse(value);
   if (!petId.success) throw notFound('Paciente');
   const { rows } = await query(
-    `SELECT cp.consented_at, cp.via, u.name AS owner_name, u.email AS owner_email
+    `SELECT cp.consented_at, cp.via, u.name AS owner_name, u.email AS owner_email,
+            CASE WHEN u.whatsapp_opt_in_at IS NOT NULL THEN u.phone END AS owner_phone
      FROM clinic_patients cp JOIN pets p ON p.id = cp.pet_id JOIN users u ON u.id = p.user_id
      WHERE cp.place_id = $1 AND cp.pet_id = $2 AND cp.revoked_at IS NULL`,
     [req.place.id, petId.data],
@@ -260,6 +302,200 @@ router.post('/:placeId/patients/:petId/:type/:recordId/validate', requireClinici
 router.get('/:placeId/follow-ups', async (req, res) => {
   const days = z.coerce.number().int().min(1).max(120).catch(30).parse(req.query.days);
   res.json(await getClinicFollowUps(req.place.id, bogotaTodayIso(), days));
+});
+
+// Recordatorio por WhatsApp a un dueño que lo autorizó (plan Pro), máximo uno por cuidado y día
+router.post('/:placeId/follow-ups/:recordId/whatsapp', requireFeature('whatsapp'), async (req, res) => {
+  const recordId = id.safeParse(req.params.recordId);
+  if (!recordId.success) throw notFound('Seguimiento');
+  const { preventive } = await getClinicFollowUps(req.place.id, bogotaTodayIso(), 120);
+  const f = preventive.find((p) => p.id === recordId.data);
+  if (!f) throw notFound('Seguimiento');
+  if (!f.owner_phone) throw new HttpError(400, `${f.owner_name.split(' ')[0]} no ha autorizado recordatorios por WhatsApp`);
+  const { rows } = await query('INSERT INTO notification_log (user_id, key) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING key', [
+    f.owner_id,
+    `wa:${f.id}:${bogotaTodayIso()}`,
+  ]);
+  if (!rows[0]) throw new HttpError(409, 'Ya se envió un recordatorio de este cuidado hoy');
+  await sendWhatsAppReminder(f.owner_phone, whatsappParams(f, req.place));
+  res.json({ sent: true });
+});
+
+// ===== Solicitudes de cita =====
+router.get('/:placeId/appointment-requests', async (req, res) => {
+  const status = z.enum(['pendiente', 'confirmada', 'rechazada', 'cancelada', 'todas']).catch('pendiente').parse(req.query.status);
+  const { rows } = await query(
+    `SELECT ar.*, p.name AS pet_name, p.species, ph.key AS photo_key, u.name AS owner_name, u.email AS owner_email,
+            CASE WHEN u.whatsapp_opt_in_at IS NOT NULL THEN u.phone END AS owner_phone, a.scheduled_at
+     FROM appointment_requests ar JOIN pets p ON p.id = ar.pet_id LEFT JOIN users u ON u.id = ar.user_id
+     LEFT JOIN pet_photos ph ON ph.pet_id = p.id LEFT JOIN appointments a ON a.id = ar.appointment_id
+     WHERE ar.place_id = $1 ${status === 'todas' ? '' : 'AND ar.status = $2'}
+     ORDER BY ${status === 'pendiente' ? 'ar.created_at' : 'ar.created_at DESC'} LIMIT 200`,
+    status === 'todas' ? [req.place.id] : [req.place.id, status],
+  );
+  res.json({ requests: rows });
+});
+
+async function pendingAppointmentRequest(req) {
+  const reqId = id.safeParse(req.params.requestId);
+  if (!reqId.success) throw notFound('Solicitud');
+  const { rows } = await query(
+    `SELECT ar.*, p.name AS pet_name FROM appointment_requests ar JOIN pets p ON p.id = ar.pet_id
+     WHERE ar.id = $1 AND ar.place_id = $2`,
+    [reqId.data, req.place.id],
+  );
+  if (!rows[0]) throw notFound('Solicitud');
+  if (rows[0].status !== 'pendiente') throw new HttpError(409, 'Esta solicitud ya fue respondida o cancelada');
+  return rows[0];
+}
+
+// Confirmar crea la cita en la historia del paciente, registrada por la clínica
+router.post('/:placeId/appointment-requests/:requestId/confirm', async (req, res) => {
+  if (req.member.site_admin) throw new HttpError(403, 'Solo el equipo de la clínica puede confirmar citas');
+  const request = await pendingAppointmentRequest(req);
+  const data = z
+    .object({ scheduled_at: z.iso.datetime({ offset: true, error: 'Fecha y hora no válidas' }), vet: optText(100), response: optText(500) })
+    .parse(req.body);
+  if (new Date(data.scheduled_at) < new Date(Date.now() - 3600000)) {
+    return res.status(400).json({ error: 'La cita debe ser en el futuro', fields: { scheduled_at: 'Elige una fecha y hora futuras' } });
+  }
+  const appointment = await withTransaction(async (client) => {
+    const { rows } = await client.query(
+      insertSql(
+        'appointments',
+        {
+          scheduled_at: data.scheduled_at,
+          reason: request.reason,
+          clinic: req.place.name,
+          place_id: req.place.id,
+          vet: data.vet,
+          notes: request.notes,
+          source: 'clinica',
+          ...stamp(req.member, req.place),
+        },
+        { pet_id: request.pet_id },
+      ),
+    );
+    await client.query("UPDATE appointment_requests SET status = 'confirmada', appointment_id = $1, response = $2, responded_at = now() WHERE id = $3", [
+      rows[0].id,
+      data.response,
+      request.id,
+    ]);
+    return rows[0];
+  });
+  if (request.user_id) {
+    const when = new Date(data.scheduled_at).toLocaleString('es-CO', { timeZone: 'America/Bogota', weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' });
+    await notifyUser(request.user_id, {
+      subject: `Cita confirmada para ${request.pet_name}`,
+      title: `Cita confirmada: ${when}`,
+      lines: [`${req.place.name} confirmó la cita de ${request.pet_name} (${request.reason}) para el ${when}.`, ...(data.response ? [data.response] : [])],
+      path: `/mascotas/${request.pet_id}?tab=citas`,
+    });
+  }
+  res.json({ appointment });
+});
+
+router.post('/:placeId/appointment-requests/:requestId/reject', async (req, res) => {
+  if (req.member.site_admin) throw new HttpError(403, 'Solo el equipo de la clínica puede responder solicitudes');
+  const request = await pendingAppointmentRequest(req);
+  const { response } = z.object({ response: optText(500) }).parse(req.body ?? {});
+  await query("UPDATE appointment_requests SET status = 'rechazada', response = $1, responded_at = now() WHERE id = $2", [response, request.id]);
+  if (request.user_id) {
+    await notifyUser(request.user_id, {
+      subject: `Sobre la cita de ${request.pet_name}`,
+      title: `${req.place.name} no pudo agendar la cita`,
+      lines: [response ?? 'Comunícate con la clínica para buscar otra fecha.'],
+      path: `/mascotas/${request.pet_id}`,
+    });
+  }
+  res.status(204).end();
+});
+
+// ===== Reportes (plan Pro) =====
+router.get('/:placeId/reports', requireFeature('reports'), async (req, res) => {
+  const today = bogotaTodayIso();
+  const linked = 'SELECT pet_id FROM clinic_patients WHERE place_id = $1 AND revoked_at IS NULL';
+  const [species, vaccines, overdue, visits, newPatients, validated] = await Promise.all([
+    query(`SELECT species, count(*)::int AS n FROM pets WHERE id IN (${linked}) GROUP BY species ORDER BY n DESC`, [req.place.id]),
+    // Cobertura: la última aplicación de cada vacuna por paciente, al día o vencida
+    query(
+      `SELECT min(name) AS name, count(*)::int AS total,
+              count(*) FILTER (WHERE next_due IS NULL OR next_due >= $2::date)::int AS up_to_date
+       FROM (SELECT DISTINCT ON (pet_id, lower(name)) pet_id, name, next_due FROM preventive_care
+             WHERE kind = 'vacuna' AND pet_id IN (${linked}) ORDER BY pet_id, lower(name), applied_on DESC, id DESC) l
+       GROUP BY lower(name) ORDER BY total DESC LIMIT 10`,
+      [req.place.id, today],
+    ),
+    query(
+      `SELECT count(DISTINCT pet_id)::int AS n FROM (
+         SELECT DISTINCT ON (pet_id, kind, lower(name)) pet_id, next_due, dismissed_at FROM preventive_care
+         WHERE pet_id IN (${linked}) ORDER BY pet_id, kind, lower(name), applied_on DESC, id DESC) l
+       WHERE next_due < $2::date AND dismissed_at IS NULL`,
+      [req.place.id, today],
+    ),
+    query(
+      `SELECT to_char(date_trunc('month', scheduled_at AT TIME ZONE 'America/Bogota'), 'YYYY-MM') AS month, count(*)::int AS n
+       FROM appointments WHERE (place_id = $1 OR validated_place_id = $1) AND status = 'completada'
+         AND scheduled_at >= date_trunc('month', now()) - interval '5 months'
+       GROUP BY 1 ORDER BY 1`,
+      [req.place.id],
+    ),
+    query(
+      `SELECT to_char(date_trunc('month', consented_at AT TIME ZONE 'America/Bogota'), 'YYYY-MM') AS month, count(*)::int AS n
+       FROM clinic_patients WHERE place_id = $1 AND consented_at >= date_trunc('month', now()) - interval '5 months'
+       GROUP BY 1 ORDER BY 1`,
+      [req.place.id],
+    ),
+    query(
+      `SELECT (SELECT count(*) FROM preventive_care WHERE validated_place_id = $1 AND validated_at > now() - interval '30 days')
+            + (SELECT count(*) FROM appointments WHERE validated_place_id = $1 AND validated_at > now() - interval '30 days')
+            + (SELECT count(*) FROM medications WHERE validated_place_id = $1 AND validated_at > now() - interval '30 days')
+            + (SELECT count(*) FROM weights WHERE validated_place_id = $1 AND validated_at > now() - interval '30 days')
+            + (SELECT count(*) FROM allergies WHERE validated_place_id = $1 AND validated_at > now() - interval '30 days') AS n`,
+      [req.place.id],
+    ),
+  ]);
+  const patients = species.rows.reduce((s, r) => s + r.n, 0);
+  res.json({
+    patients,
+    overdue_patients: overdue.rows[0].n,
+    validated_last_30: Number(validated.rows[0].n),
+    species: species.rows,
+    vaccines: vaccines.rows,
+    visits_by_month: visits.rows,
+    new_patients_by_month: newPatients.rows,
+  });
+});
+
+const csvCell = (v) => {
+  const s = v == null ? '' : String(v);
+  // Evita que Excel interprete fórmulas en datos ingresados por usuarios
+  const safe = /^[=+\-@]/.test(s) ? `'${s}` : s;
+  return /[",;\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+};
+
+router.get('/:placeId/reports/patients.csv', requireFeature('reports'), async (req, res) => {
+  const { rows } = await query(
+    `SELECT p.name, p.species, p.breed, p.birth_date, p.microchip, u.name AS owner_name, u.email AS owner_email, cp.consented_at,
+            (SELECT max(scheduled_at) FROM appointments a WHERE a.pet_id = p.id AND a.status = 'completada'
+               AND (a.place_id = $1 OR a.validated_place_id = $1)) AS last_visit,
+            (SELECT min(next_due) FROM (
+               SELECT DISTINCT ON (kind, lower(name)) next_due, dismissed_at FROM preventive_care
+               WHERE pet_id = p.id ORDER BY kind, lower(name), applied_on DESC, id DESC) l
+             WHERE l.next_due IS NOT NULL AND l.dismissed_at IS NULL) AS next_due
+     FROM clinic_patients cp JOIN pets p ON p.id = cp.pet_id JOIN users u ON u.id = p.user_id
+     WHERE cp.place_id = $1 AND cp.revoked_at IS NULL ORDER BY p.name`,
+    [req.place.id],
+  );
+  const header = ['Mascota', 'Especie', 'Raza', 'Nacimiento', 'Microchip', 'Dueño', 'Correo', 'Paciente desde', 'Última visita', 'Próximo refuerzo'];
+  const lines = rows.map((r) =>
+    [r.name, r.species, r.breed, r.birth_date, r.microchip, r.owner_name, r.owner_email, r.consented_at.toISOString().slice(0, 10), r.last_visit?.toISOString().slice(0, 10), r.next_due]
+      .map(csvCell)
+      .join(','),
+  );
+  res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="pacientes-${req.place.id}.csv"` });
+  // BOM para que Excel lea bien las tildes
+  res.send(`\uFEFF${[header.join(','), ...lines].join('\n')}`);
 });
 
 router.get('/:placeId/reviews', async (req, res) => {

@@ -9,11 +9,13 @@ import { requireAuth } from './auth.js';
 import { config } from './config.js';
 import { pool, query } from './db.js';
 import { errorHandler, notFound } from './errors.js';
+import adminRoutes from './routes/admin.js';
 import authRoutes from './routes/auth.js';
 import clinicRoutes from './routes/clinics.js';
 import dashboardRoutes from './routes/dashboard.js';
 import notificationRoutes from './routes/notifications.js';
 import petRoutes from './routes/pets.js';
+import placeRequestRoutes from './routes/placeRequests.js';
 import placeRoutes from './routes/places.js';
 import { publicEmergencyRouter, publicShareRouter } from './routes/share.js';
 import { renderClinicHtml, sitemapXml } from './seo.js';
@@ -52,6 +54,8 @@ export function createApp() {
   app.use('/api/dashboard', requireAuth, dashboardRoutes);
   app.use('/api/places', placeRoutes);
   app.use('/api/clinics', requireAuth, clinicRoutes);
+  app.use('/api/place-requests', requireAuth, placeRequestRoutes);
+  app.use('/api/admin', requireAuth, adminRoutes);
 
   // Fotos de mascotas: la clave es aleatoria y cambia con cada foto, así que se cachean para siempre
   app.get('/api/photos/:key', async (req, res) => {

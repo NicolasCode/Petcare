@@ -4,10 +4,14 @@ export const PLANS = {
   gratis: {
     label: 'Gratis',
     memberLimit: 5,
+    reports: false,
+    whatsapp: false,
     features: [
       'Perfil público con horarios, servicios, especialidades y equipos',
+      'Aviso de "veterinario disponible ahora"',
       'Registro de pacientes con enlace o código QR',
       'Vacunas, controles y registros validados por la clínica',
+      'Solicitudes de cita de los dueños',
       'Próximos seguimientos de los pacientes',
       'Reseñas verificadas y respuesta a reseñas',
       'Hasta 5 personas en el equipo',
@@ -16,12 +20,13 @@ export const PLANS = {
   pro: {
     label: 'Pro',
     memberLimit: 50,
-    soon: true,
+    reports: true,
+    whatsapp: true,
     features: [
-      'Recordatorios automáticos a los dueños por WhatsApp',
-      'Agenda de citas en línea',
-      'Reportes de vacunación y seguimiento',
-      'Equipos de hasta 50 personas y varias sedes',
+      'Todo lo del plan Gratis',
+      'Recordatorios automáticos por WhatsApp a los dueños que lo autoricen',
+      'Reportes de vacunación, seguimiento y pacientes con exportación a CSV',
+      'Equipos de hasta 50 personas',
     ],
   },
 };

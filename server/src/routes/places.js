@@ -48,6 +48,10 @@ const searchSchema = z.object({
     .enum(['true', 'false'])
     .optional()
     .transform((v) => v === 'true'),
+  vetNow: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => v === 'true'),
   q: z.string().trim().max(100).optional(),
 });
 
@@ -60,6 +64,8 @@ const DISTANCE = `6371 * 2 * asin(sqrt(
 const PUBLIC_COLUMNS = `places.id, places.name, places.kind, places.address, places.locality, places.city, places.phone, places.whatsapp,
   places.website, places.email, places.open_24h, places.home_visits, places.description, places.services, places.specialties,
   places.equipment, places.lat, places.lng,
+  CASE WHEN places.available_until > now() THEN places.available_until END AS available_until,
+  CASE WHEN places.available_until > now() THEN places.available_note END AS available_note,
   (SELECT round(avg(rating)::numeric, 1) FROM reviews r WHERE r.place_id = places.id AND r.hidden_at IS NULL) AS rating_avg,
   (SELECT count(*)::int FROM reviews r WHERE r.place_id = places.id AND r.hidden_at IS NULL) AS rating_count,
   EXISTS (SELECT 1 FROM place_members m WHERE m.place_id = places.id) AS on_kaimi`;
@@ -83,6 +89,7 @@ router.get('/', async (req, res) => {
     where.push(`kind = $${params.length}`);
   }
   if (s.open24h) where.push('open_24h');
+  if (s.vetNow) where.push('available_until > now()');
   if (s.q) {
     params.push(`%${s.q.replace(/[\\%_]/g, '\\$&')}%`);
     const p = `$${params.length}`;
@@ -166,15 +173,6 @@ router.delete('/:placeId', requireAuth, requireAdmin, async (req, res) => {
   if (!placeId.success) throw notFound('Lugar');
   const { rowCount } = await query('DELETE FROM places WHERE id = $1', [placeId.data]);
   if (!rowCount) throw notFound('Lugar');
-  res.status(204).end();
-});
-
-// Moderación: ocultar una reseña que incumple las normas (no se borra)
-router.post('/:placeId/reviews/:reviewId/hide', requireAuth, requireAdmin, async (req, res) => {
-  const reviewId = id.safeParse(req.params.reviewId);
-  if (!reviewId.success) throw notFound('Reseña');
-  const { rowCount } = await query('UPDATE reviews SET hidden_at = now() WHERE id = $1 AND place_id = $2', [reviewId.data, id.catch(0).parse(req.params.placeId)]);
-  if (!rowCount) throw notFound('Reseña');
   res.status(204).end();
 });
 

@@ -8,6 +8,7 @@ import { HttpError } from '../errors.js';
 import { clearSessionCookie, requireAuth, setSessionCookie } from '../auth.js';
 import { renderMail, sendMailSafe } from '../mailer.js';
 import { consumeAuthToken, createAuthToken } from '../tokens.js';
+import { normalizePhone } from '../whatsapp.js';
 import { DEMO_CLINIC_EMAIL, DEMO_EMAIL } from '../seed-demo.js';
 
 const router = Router();
@@ -54,6 +55,8 @@ export async function publicUser(user) {
     is_admin: isAdminEmail(user.email),
     email_verified: Boolean(user.email_verified_at),
     notify_email: user.notify_email,
+    phone: user.phone,
+    whatsapp_opt_in: Boolean(user.whatsapp_opt_in_at),
     clinics,
   };
 }
@@ -178,11 +181,27 @@ router.get('/me', requireAuth, async (req, res) => {
 
 router.put('/me', requireAuth, async (req, res) => {
   const data = z
-    .object({ name: z.string().trim().min(1, 'Escribe tu nombre').max(80).optional(), notify_email: z.boolean().optional() })
+    .object({
+      name: z.string().trim().min(1, 'Escribe tu nombre').max(80).optional(),
+      notify_email: z.boolean().optional(),
+      // Celular para WhatsApp: se guarda solo con autorización expresa y se borra al retirarla
+      phone: z
+        .string()
+        .trim()
+        .max(20)
+        .refine((v) => !v || normalizePhone(v), 'Escribe un celular válido (10 dígitos)')
+        .optional(),
+      whatsapp_opt_in: z.boolean().optional(),
+    })
+    .refine((d) => !d.whatsapp_opt_in || d.phone, { path: ['phone'], message: 'Escribe tu celular para recibir WhatsApp' })
     .parse(req.body);
+  const optIn = data.whatsapp_opt_in;
   const { rows } = await query(
-    'UPDATE users SET name = COALESCE($1, name), notify_email = COALESCE($2, notify_email) WHERE id = $3 RETURNING *',
-    [data.name ?? null, data.notify_email ?? null, req.userId],
+    `UPDATE users SET name = COALESCE($1, name), notify_email = COALESCE($2, notify_email),
+       phone = CASE WHEN $4::boolean IS NULL THEN phone WHEN $4 THEN $3 ELSE NULL END,
+       whatsapp_opt_in_at = CASE WHEN $4::boolean IS NULL THEN whatsapp_opt_in_at WHEN $4 THEN COALESCE(whatsapp_opt_in_at, now()) ELSE NULL END
+     WHERE id = $5 RETURNING *`,
+    [data.name ?? null, data.notify_email ?? null, data.phone || null, optIn ?? null, req.userId],
   );
   res.json({ user: await publicUser(rows[0]) });
 });

@@ -14,6 +14,8 @@ export const DEMO_EMAIL = 'demo@kaimi.co';
 export const DEMO_CLINIC_EMAIL = 'clinica@kaimi.co';
 // Otra dueña ficticia (sin acceso de un clic) para que la clínica tenga más de un paciente
 const DEMO_OTHER_EMAIL = 'laura.demo@kaimi.co';
+// Veterinaria independiente ficticia con una solicitud de panel pendiente (para el panel de administración)
+const DEMO_REQUEST_EMAIL = 'vet.solicitud.demo@kaimi.co';
 const DEMO_CLINIC = 'Clínica Veterinaria Demo Chicó';
 
 const day = 86400000;
@@ -253,7 +255,12 @@ export async function seedDemo({ password = process.env.DEMO_PASSWORD || 'kaimi-
 
     // Reinicia las cuentas demo (el borrado en cascada elimina mascotas, historia, equipo y reseñas)
     // También borra la cuenta demo anterior al cambio de marca (demo@kurapet.co)
-    await client.query("DELETE FROM users WHERE lower(email) IN ($1, $2, $3, 'demo@kurapet.co')", [DEMO_EMAIL, DEMO_CLINIC_EMAIL, DEMO_OTHER_EMAIL]);
+    await client.query("DELETE FROM users WHERE lower(email) IN ($1, $2, $3, $4, 'demo@kurapet.co')", [
+      DEMO_EMAIL,
+      DEMO_CLINIC_EMAIL,
+      DEMO_OTHER_EMAIL,
+      DEMO_REQUEST_EMAIL,
+    ]);
     const createUser = async (name, email) =>
       (
         await client.query(
@@ -264,10 +271,18 @@ export async function seedDemo({ password = process.env.DEMO_PASSWORD || 'kaimi-
     const userId = await createUser('Nico Demo', DEMO_EMAIL);
     const vetUserId = await createUser(VALIDATOR.display_name, DEMO_CLINIC_EMAIL);
     const otherUserId = await createUser('Laura Demo', DEMO_OTHER_EMAIL);
+    const requesterId = await createUser('Dra. Sofía Demo', DEMO_REQUEST_EMAIL);
+    // Ambos dueños autorizaron recordatorios por WhatsApp (números ficticios)
+    await client.query("UPDATE users SET phone = '3000000000', whatsapp_opt_in_at = now() WHERE id = ANY($1)", [[userId, otherUserId]]);
 
     const { rows: clinicRows } = await client.query('SELECT id, name FROM places WHERE name = $1', [DEMO_CLINIC]);
     const clinic = { ...clinicRows[0], vetUserId };
-    await client.query('UPDATE places SET intake_code = COALESCE(intake_code, $2) WHERE id = $1', [clinic.id, randomToken(9)]);
+    // Clínica demo en plan Pro (reportes y WhatsApp) y con veterinario disponible por 8 horas
+    await client.query(
+      `UPDATE places SET intake_code = COALESCE(intake_code, $2), plan = 'pro', available_until = now() + interval '8 hours',
+         available_note = 'Atendemos urgencias leves sin cita' WHERE id = $1`,
+      [clinic.id, randomToken(9)],
+    );
     await client.query(insertSql('place_members', { place_id: clinic.id, user_id: vetUserId, role: 'admin', ...VALIDATOR, specialty: 'Dermatología' }));
 
     for (const data of PETS) {
@@ -279,6 +294,17 @@ export async function seedDemo({ password = process.env.DEMO_PASSWORD || 'kaimi-
     }
     const rockyId = await insertPet(client, otherUserId, OTHER_PET, clinic);
     await client.query("INSERT INTO clinic_patients (place_id, pet_id, granted_by, via) VALUES ($1, $2, $3, 'dueno')", [clinic.id, rockyId, otherUserId]);
+    await client.query(
+      `INSERT INTO appointment_requests (place_id, pet_id, user_id, reason, preferred_date, preferred_time, notes)
+       VALUES ($1, $2, $3, 'Refuerzo de rabia (está vencido)', $4, 'manana', 'Rocky se pone ansioso en la sala de espera.')`,
+      [clinic.id, rockyId, otherUserId, daysFromNow(2)],
+    );
+    await client.query(
+      `INSERT INTO place_requests (user_id, name, kind, locality, phone, whatsapp, lat, lng, display_name, professional_card, message)
+       VALUES ($1, 'Dra. Sofía Demo · Veterinaria a domicilio', 'independiente', 'Usaquén', '300 000 0001', '300 000 0001', 4.70, -74.03,
+               'Dra. Sofía Demo', 'TP 99999-DEMO', 'Atiendo perros y gatos a domicilio en el norte de Bogotá.')`,
+      [requesterId],
+    );
 
     await client.query('COMMIT');
   } catch (err) {

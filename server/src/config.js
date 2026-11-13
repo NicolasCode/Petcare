@@ -33,6 +33,13 @@ export const config = {
     privateKey: process.env.VAPID_PRIVATE_KEY || null,
     subject: process.env.VAPID_SUBJECT || 'mailto:hola@kaimi.co',
   },
+  // Recordatorios por WhatsApp (plan Pro de las clínicas) con la Cloud API de Meta
+  whatsapp: {
+    token: process.env.WHATSAPP_TOKEN || null,
+    phoneId: process.env.WHATSAPP_PHONE_NUMBER_ID || null,
+    template: process.env.WHATSAPP_TEMPLATE || 'recordatorio_cuidado',
+    language: process.env.WHATSAPP_TEMPLATE_LANG || 'es',
+  },
 };
 
 export const isAdminEmail = (email) => config.adminEmails.includes(email.toLowerCase());

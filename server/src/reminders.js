@@ -77,7 +77,8 @@ export async function getClinicFollowUps(placeId, today, days = PREVENTIVE_WINDO
   const [preventive, appointments] = await Promise.all([
     query(
       `SELECT l.id, l.pet_id, l.kind, l.name, l.applied_on, l.next_due, l.validated_at IS NOT NULL AS validated,
-              p.name AS pet_name, p.species, u.name AS owner_name, u.email AS owner_email
+              p.name AS pet_name, p.species, u.id AS owner_id, u.name AS owner_name, u.email AS owner_email,
+              CASE WHEN u.whatsapp_opt_in_at IS NOT NULL THEN u.phone END AS owner_phone
        FROM (${LATEST_PREVENTIVE(linked)}) l
        JOIN pets p ON p.id = l.pet_id JOIN users u ON u.id = p.user_id
        WHERE l.next_due IS NOT NULL AND l.dismissed_at IS NULL
