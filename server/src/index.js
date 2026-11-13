@@ -2,6 +2,7 @@ import { createApp } from './app.js';
 import { config } from './config.js';
 import { pool } from './db.js';
 import { migrate } from './migrate.js';
+import { startScheduler } from './notifications.js';
 import { seedDemo } from './seed-demo.js';
 
 await migrate();
@@ -11,6 +12,9 @@ if (process.env.SEED_DEMO === 'true') {
   const demo = await seedDemo();
   console.log(`Datos de demo cargados. Ingresa con ${demo.email}`);
 }
+
+// Resumen diario de recordatorios por correo y push
+startScheduler();
 
 const server = createApp().listen(config.port, () => {
   console.log(`Kaimi escuchando en el puerto ${config.port}`);

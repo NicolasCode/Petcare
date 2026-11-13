@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { query } from '../db.js';
-import { notFound } from '../errors.js';
-import { id, insertSql, optDate, optPositive, optText, reqDate, reqText, updateSql } from '../validation.js';
+import { HttpError, notFound } from '../errors.js';
+import { id, insertSql, optDate, optId, optPositive, optText, reqDate, reqText, updateSql } from '../validation.js';
 
 const dateOrder = (from, to) => (d) => !d[from] || !d[to] || d[to] >= d[from];
 
@@ -17,7 +17,11 @@ export const RECORD_TYPES = {
         name: reqText(100),
         applied_on: reqDate,
         next_due: optDate,
+        lot: optText(60),
+        product_expires_on: optDate,
         vet: optText(100),
+        vet_card: optText(40),
+        place_id: optId,
         notes: optText(1000),
       })
       .refine(dateOrder('applied_on', 'next_due'), { path: ['next_due'], message: 'Debe ser posterior a la fecha de aplicación' }),
@@ -54,6 +58,7 @@ export const RECORD_TYPES = {
       scheduled_at: z.iso.datetime({ offset: true, error: 'Fecha y hora no válidas' }),
       reason: reqText(150),
       clinic: optText(150),
+      place_id: optId,
       vet: optText(100),
       status: z.enum(['programada', 'completada', 'cancelada']).default('programada'),
       diagnosis: optText(2000),
@@ -77,13 +82,71 @@ export async function listRecords(type, petId) {
   return rows;
 }
 
-// Montado en /api/pets/:petId — req.pet ya fue validado como propiedad del usuario
+export async function getRecord(type, petId, recordId) {
+  const parsed = id.safeParse(recordId);
+  if (!parsed.success) throw notFound('Registro');
+  const { rows } = await query(`SELECT * FROM ${RECORD_TYPES[type].table} WHERE id = $1 AND pet_id = $2`, [parsed.data, petId]);
+  if (!rows[0]) throw notFound('Registro');
+  return rows[0];
+}
+
+export const isLocked = (record) => record.source === 'clinica' || record.validated_at !== null;
+
+// Un registro que creó o validó una clínica solo lo puede cambiar esa clínica
+function assertEditableByCaregiver(record) {
+  if (isLocked(record)) {
+    throw new HttpError(403, `Este registro lo validó ${record.validated_place_name ?? 'una clínica'}; solo la clínica puede modificarlo.`);
+  }
+}
+
+// Montado en /api/pets/:petId — req.pet ya fue validado como accesible para el usuario
 const router = Router({ mergeParams: true });
 
 router.param('type', (req, res, next, type) => {
   if (!Object.hasOwn(RECORD_TYPES, type)) throw notFound('Recurso');
   req.recordType = RECORD_TYPES[type];
   next();
+});
+
+// "Ya no aplica": oculta el recordatorio del refuerzo sin borrar la aplicación
+router.post('/preventive/:recordId/dismiss', async (req, res) => {
+  const record = await getRecord('preventive', req.pet.id, req.params.recordId);
+  const { rows } = await query('UPDATE preventive_care SET dismissed_at = now() WHERE id = $1 RETURNING *', [record.id]);
+  res.json({ record: rows[0] });
+});
+
+router.delete('/preventive/:recordId/dismiss', async (req, res) => {
+  const record = await getRecord('preventive', req.pet.id, req.params.recordId);
+  const { rows } = await query('UPDATE preventive_care SET dismissed_at = NULL WHERE id = $1 RETURNING *', [record.id]);
+  res.json({ record: rows[0] });
+});
+
+// Marcar una cita como atendida o cancelada desde el seguimiento
+router.post('/appointments/:recordId/status', async (req, res) => {
+  const { status } = z.object({ status: z.enum(['programada', 'completada', 'cancelada']) }).parse(req.body);
+  const record = await getRecord('appointments', req.pet.id, req.params.recordId);
+  assertEditableByCaregiver(record);
+  const { rows } = await query('UPDATE appointments SET status = $1 WHERE id = $2 RETURNING *', [status, record.id]);
+  res.json({ record: rows[0] });
+});
+
+// Reseña verificable: solo de citas completadas que la clínica registró o validó
+router.post('/appointments/:recordId/review', async (req, res) => {
+  const data = z.object({ rating: z.number().int().min(1).max(5), comment: optText(1000) }).parse(req.body);
+  const appt = await getRecord('appointments', req.pet.id, req.params.recordId);
+  if (!appt.validated_place_id) throw new HttpError(403, 'Solo se pueden calificar las consultas que la clínica registró en Kaimi.');
+  if (appt.status !== 'completada' || new Date(appt.scheduled_at) > new Date()) {
+    throw new HttpError(400, 'Podrás calificar la consulta cuando se haya completado.');
+  }
+  const { rows } = await query(
+    `INSERT INTO reviews (place_id, user_id, appointment_id, rating, comment) VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (appointment_id) DO UPDATE SET rating = EXCLUDED.rating, comment = EXCLUDED.comment, created_at = now()
+       WHERE reviews.user_id = EXCLUDED.user_id
+     RETURNING id, appointment_id, rating, comment, reply, created_at`,
+    [appt.validated_place_id, req.userId, appt.id, data.rating, data.comment],
+  );
+  if (!rows[0]) throw new HttpError(403, 'Otra persona ya calificó esta consulta.');
+  res.status(201).json({ review: rows[0] });
 });
 
 router.get('/:type', async (req, res) => {
@@ -99,20 +162,18 @@ router.post('/:type', async (req, res) => {
 
 router.put('/:type/:recordId', async (req, res) => {
   const { table, schema } = req.recordType;
-  const recordId = id.safeParse(req.params.recordId);
-  if (!recordId.success) throw notFound('Registro');
+  const record = await getRecord(req.params.type, req.pet.id, req.params.recordId);
+  assertEditableByCaregiver(record);
   const data = schema.parse(req.body);
-  const { rows } = await query(updateSql(table, data, { id: recordId.data, pet_id: req.pet.id }));
-  if (!rows[0]) throw notFound('Registro');
+  const { rows } = await query(updateSql(table, data, { id: record.id, pet_id: req.pet.id }));
   res.json({ record: rows[0] });
 });
 
 router.delete('/:type/:recordId', async (req, res) => {
   const { table } = req.recordType;
-  const recordId = id.safeParse(req.params.recordId);
-  if (!recordId.success) throw notFound('Registro');
-  const { rowCount } = await query(`DELETE FROM ${table} WHERE id = $1 AND pet_id = $2`, [recordId.data, req.pet.id]);
-  if (!rowCount) throw notFound('Registro');
+  const record = await getRecord(req.params.type, req.pet.id, req.params.recordId);
+  assertEditableByCaregiver(record);
+  await query(`DELETE FROM ${table} WHERE id = $1`, [record.id]);
   res.status(204).end();
 });
 
