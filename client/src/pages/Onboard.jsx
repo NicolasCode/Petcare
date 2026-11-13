@@ -102,6 +102,33 @@ const STEPS = [
     notice: ['La duración se calcula con el tamaño de la bolsa y la ración diaria (15 kg ÷ 450 g = 33 días).', 'Con “Editar plan” cambias el alimento o la ración.'],
   },
   {
+    icon: 'card',
+    title: 'Carné digital con QR',
+    to: (ids) => (ids.Timothy ? `/mascotas/${ids.Timothy}/carne` : '/mascotas'),
+    cta: 'Abrir el carné',
+    doThis: [
+      'Abre el carné de Timothy: foto, datos, alergias y tabla de vacunas con lote y vencimiento.',
+      'Escanea el QR con otro celular: abre la página de emergencia con el teléfono de contacto.',
+      'Prueba “Imprimir o guardar como PDF”.',
+    ],
+    notice: [
+      'La séxtuple aparece “Validada por Clínica Veterinaria Demo Chicó” con la veterinaria y su tarjeta profesional; la rabia, “Registrado por el cuidador”.',
+      'Lo validado por la clínica tiene un candado: el dueño no puede editarlo.',
+    ],
+  },
+  {
+    icon: 'clock',
+    title: 'Seguimiento y clínica responsable',
+    to: (ids) => pet(ids, 'Timothy'),
+    cta: 'Ver seguimiento',
+    doThis: [
+      'En el Resumen de Timothy, toca “Ya se aplicó” en la pipeta vencida: el próximo refuerzo se calcula solo.',
+      'Toca “Ya no aplica” en otro refuerzo y reactívalo desde “Atendidos”.',
+      'Usa Llamar o WhatsApp de la clínica responsable.',
+    ],
+    notice: ['La cita de control la registró la clínica: ella la cerrará como atendida.', 'En Citas, la consulta pasada permite calificar la atención (reseña verificada).'],
+  },
+  {
     icon: 'share',
     title: 'Compartir con el veterinario',
     to: (ids) => pet(ids, 'Timothy'),
@@ -123,7 +150,10 @@ const STEPS = [
       'Filtra por “Urgencias” o “Abierto 24h”, o busca “felina”.',
       'Prueba “Cómo llegar”: abre la ruta en Google Maps.',
     ],
-    notice: ['Los 8 lugares de la demo son ficticios.', 'Los administradores (ADMIN_EMAILS) ven “Agregar lugar” y pueden editar el directorio.'],
+    notice: [
+      'Cada lugar muestra si está abierto ahora, especialidades, reseñas verificadas y su perfil público (también sin cuenta en /directorio).',
+      'El orden es solo por distancia: ningún plan compra posición. Los 8 lugares de la demo son ficticios.',
+    ],
   },
   {
     icon: 'paw',
@@ -148,7 +178,7 @@ const SCRIPT = [
     time: '0:00',
     problem: '¿Qué pasa cuando una mascota enferma a las 9:00 PM?',
     show: 'Inicio → “¿Una urgencia?” → mapa filtrado por urgencias, llamar o cómo llegar.',
-    step: 8,
+    step: 10,
   },
   {
     time: '0:45',
@@ -176,19 +206,19 @@ const SCRIPT = [
 ];
 
 const NOW = [
-  'Perfil 360° con historia clínica completa',
-  'Recordatorios de refuerzos, citas, alimento y tratamientos',
-  'Historia portable con enlaces temporales y revocables',
-  'Directorio geolocalizado de clínicas, urgencias y farmacias',
-  'Autorización de datos (Ley 1581) y eliminación de cuenta',
-  'Web responsive, instalable en el celular y con modo oscuro',
+  'Perfil 360° con foto, carné digital imprimible y QR de emergencia',
+  'Vacunas con lote, vencimiento y médico; registros del cuidador vs. validados por clínica',
+  'Seguimiento: marcar refuerzos y citas como atendidos, contacto con la clínica',
+  'Recordatorios por correo y notificaciones push',
+  'Panel de clínica: pacientes por QR, registros validados, seguimientos, equipo y reseñas',
+  'Directorio público con horarios, abierto ahora, veterinarios independientes y reseñas verificadas',
+  'Familia: varios cuidadores por mascota',
+  'Recuperar contraseña, confirmación de correo y Ley 1581',
 ];
 const NEXT = [
-  'Notificaciones push y por correo de los recordatorios',
-  'Cuentas para veterinarios y clínicas, agenda y CRM (Fase 2)',
-  'Plan PRO con descuentos en clínicas aliadas (Fase 2)',
+  'Plan Pro para clínicas: recordatorios por WhatsApp, agenda en línea y reportes',
   'Marketplace de farmacia y alimento con compra en un clic (Fase 3)',
-  'Teleorientación y adjuntar fotos o exámenes',
+  'Teleorientación y adjuntar exámenes',
 ];
 
 function pet(ids, name, tab) {
@@ -235,6 +265,19 @@ export default function Onboard() {
         const { pets } = await api.get('/pets');
         navigate(target(Object.fromEntries(pets.map((p) => [p.name, p.id]))));
       }
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const enterClinic = async () => {
+    setBusy(true);
+    try {
+      await loginDemo('clinica');
+      toast('Entraste como la veterinaria de la clínica demo');
+      navigate('/clinica');
     } catch (err) {
       toast(err.message, 'error');
     } finally {
@@ -315,8 +358,13 @@ export default function Onboard() {
                   <a className="btn btn-on-dark btn-lg" href="#recorrido">
                     Empezar el recorrido
                   </a>
+                  {!user && (
+                    <button className="btn btn-on-dark btn-lg" onClick={enterClinic} disabled={busy}>
+                      Entrar como clínica
+                    </button>
+                  )}
                   <p className="ob-creds">
-                    Cuenta demo: <strong>{demo.email}</strong>
+                    Cuenta demo: <strong>{demo.email}</strong> · clínica: <strong>{demo.clinic_email}</strong>
                     {demo.password && (
                       <>
                         {' '}
@@ -392,7 +440,10 @@ export default function Onboard() {
                   <Icon name="check" size={16} /> 2 farmacias veterinarias
                 </li>
                 <li>
-                  <Icon name="check" size={16} /> 1 veterinario a domicilio
+                  <Icon name="check" size={16} /> 1 veterinario independiente a domicilio
+                </li>
+                <li>
+                  <Icon name="check" size={16} /> Clínica Demo Chicó con panel, 2 pacientes y 2 reseñas verificadas
                 </li>
               </ul>
             </article>

@@ -1,27 +1,39 @@
 # Kaimi 🐾
 
 **Todo su cuidado, en un solo lugar.** La historia clínica y el cuidado de tu mascota, siempre a mano.
-MVP de la *Fase 1 · Validación & MVP* del roadmap: perfil 360° de la mascota, registro médico, recordatorios y geolocalización básica en Bogotá.
+Fase 1 (MVP para dueños) + herramientas para clínicas fundadoras: carné digital, registros validados por clínica, seguimiento, directorio con horarios y reseñas verificadas, y la base del modelo freemium.
 
 Stack: **React 19 + Vite** (frontend) · **Node 22 + Express 5** (API) · **PostgreSQL 16** · despliegue en **Railway** como un solo servicio.
 
 ## Qué incluye
 
+### Para dueños
 | Módulo | Detalle |
 |---|---|
-| Cuentas | Registro/ingreso con cookie `httpOnly`, autorización de tratamiento de datos (Ley 1581) obligatoria, eliminación de cuenta |
-| Perfil 360° | Especie, raza, edad, peso actual, esterilización, microchip, clínica habitual, notas y alergias destacadas en rojo |
-| Historia clínica | Vacunas / desparasitación / antipulgas con próximo refuerzo, alergias con severidad, medicamentos, citas con diagnóstico y curva de peso |
-| Recordatorios | Refuerzos vencidos o próximos (30 días), citas (60 días), alimento por acabarse (7 días) y tratamientos en curso |
-| Plan nutricional | Calcula cuándo se acaba la bolsa (kg ÷ ración diaria) y permite marcar “Compré una bolsa nueva” |
-| Historia portable | Enlace de solo lectura para el veterinario (24 h, 7 o 30 días), revocable, con contador de vistas y sin datos de contacto del dueño |
-| Cerca de mí | Mapa (Leaflet + OpenStreetMap) con clínicas, urgencias 24 h, farmacias y veterinarios a domicilio ordenados por distancia; filtros, búsqueda, llamar, WhatsApp y “Cómo llegar” |
-| Administración | Los correos en `ADMIN_EMAILS` pueden crear, editar y eliminar lugares del directorio desde la misma pantalla |
+| Cuentas | Registro con autorización de datos (Ley 1581), confirmación de correo, recuperar y cambiar contraseña (cierra las demás sesiones), eliminación de cuenta |
+| Perfil 360° | Foto, especie, raza, edad, peso, esterilización, microchip, clínica habitual enlazada al directorio, alergias destacadas |
+| Carné digital | Carné con la marca Kaimi, imprimible o en PDF, con tabla de vacunas (lote, vencimiento del producto, médico) y QR de emergencia permanente y revocable |
+| Historia clínica | Vacunas / desparasitación / antipulgas, alergias, medicamentos, citas y peso. Cada registro dice si lo ingresó el cuidador o lo validó una clínica (con veterinario y tarjeta profesional); lo validado queda bloqueado para el dueño |
+| Seguimiento | Próximas fechas con estado; “Ya se aplicó” (calcula el siguiente refuerzo), “Ya no aplica”, marcar citas atendidas o canceladas, contacto con la clínica responsable |
+| Recordatorios | En la app, resumen diario por correo y notificaciones push: 7 días antes, el día anterior, el mismo día y 3 días después |
+| Familia | Varios cuidadores por mascota: ven y registran, no borran ni comparten |
+| Clínicas con acceso | El dueño vincula una clínica con su código o QR, autoriza el acceso y lo puede revocar |
+| Historia portable | Enlace temporal de solo lectura para cualquier veterinario |
 
-Diseño mobile-first: pestañas inferiores en móvil, barra lateral en escritorio, formularios en hoja inferior, modo oscuro automático e instalable como PWA.
+### Directorio
+Público (`/directorio`, sin cuenta), con horario semanal y “abierto ahora” en hora de Colombia, especialidades, equipos, veterinarios independientes (con atención a domicilio), perfil público por clínica (`/clinicas/:id-nombre`, con metadatos para buscadores y WhatsApp, y `sitemap.xml`) y reseñas verificadas: solo se califica una consulta que la propia clínica registró o validó. **El orden es por distancia o nombre; ni el plan ni las reseñas cambian la posición** (hay una prueba que lo verifica).
 
-### Fuera de alcance (fases siguientes del roadmap)
-Cuentas de veterinarios/clínicas y CRM (Fase 2), marketplace de farmacia y alimento (Fase 3), teleorientación, plan PRO y pagos. Los recordatorios se ven dentro de la app; todavía no se envían push ni correos.
+### Para clínicas (`/clinica`)
+Pacientes (alta por enlace o QR imprimible con autorización del dueño), historia de cada paciente con registros validados por la clínica y validación de lo que ingresó el cuidador, próximos seguimientos con correo al dueño, perfil y horario editables, equipo con roles (admin, veterinario, recepción) y respuesta a reseñas.
+
+### Freemium
+Plan **Gratis** con todo lo anterior (hasta 5 personas en el equipo) y plan **Pro** marcado como “próximamente” (`server/src/plans.js`). El administrador del directorio asigna el plan. El plan nunca interviene en el orden del directorio.
+
+### Administración
+Los correos en `ADMIN_EMAILS` crean y editan lugares, asignan el equipo de cada clínica desde su panel (ícono de equipo en “Cerca de mí”) y ocultan reseñas que incumplan las normas. Para activar una clínica: crea el lugar, pídele al veterinario que se registre y agrégalo como administrador en **Equipo**.
+
+### Fuera de alcance
+Funciones del plan Pro (WhatsApp automático, agenda en línea, reportes), marketplace (Fase 3) y teleorientación.
 
 ## Desarrollo local
 
@@ -31,7 +43,7 @@ Requisitos: Node 22.12+ y PostgreSQL 16.
 cp .env.example .env          # ajusta DATABASE_URL, JWT_SECRET y ADMIN_EMAILS
 createdb kaimi
 npm install
-npm run seed:demo                      # opcional: cuenta demo@kaimi.co / kaimi-demo con datos ficticios
+npm run seed:demo                      # opcional: demo@kaimi.co y clinica@kaimi.co / kaimi-demo con datos ficticios
 npm run dev                            # API en :3000 y web en http://localhost:5173
 ```
 
@@ -58,6 +70,9 @@ La app es **un solo servicio**: el mismo contenedor compila el frontend y lo sir
    | `JWT_SECRET` | un secreto largo, p. ej. la salida de `openssl rand -hex 32` |
    | `NODE_ENV` | `production` |
    | `ADMIN_EMAILS` | tu correo, para gestionar el directorio de clínicas |
+   | `RESEND_API_KEY`, `MAIL_FROM` | para enviar correos (confirmación, recuperar contraseña, recordatorios). Sin ellas, los correos solo se escriben en el log |
+   | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | para notificaciones push; genéralas con `npx web-push generate-vapid-keys` |
+   | `APP_URL` | opcional: dominio propio para los enlaces de los correos (por defecto usa el dominio de Railway) |
 
 4. **Settings → Networking → Generate Domain**. El healthcheck es `/api/health`.
 
@@ -66,9 +81,14 @@ La app es **un solo servicio**: el mismo contenedor compila el frontend y lo sir
 
 ### Datos de demostración
 
-Agrega la variable `SEED_DEMO=true` al servicio y deja que se redespliegue. Al arrancar se crea (o se reinicia, con fechas frescas) la cuenta **`demo@kaimi.co` / `kaimi-demo`** (cámbiala con `DEMO_PASSWORD`) con dos mascotas, Timothy y Luna, y su historia clínica completa: alergia grave, vacunas al día y vencidas, tratamiento en curso, cita próxima, curva de peso y alimento por acabarse. Además carga 8 lugares ficticios en el mapa.
+Agrega la variable `SEED_DEMO=true` al servicio y deja que se redespliegue. Al arrancar se crean (o se reinician, con fechas frescas) dos cuentas con contraseña `kaimi-demo` (cámbiala con `DEMO_PASSWORD`):
 
-Abre **`/onboard`** para el recorrido guiado: botón “Entrar a la demo” de un clic, 11 pasos con enlaces directos a cada pantalla, guion de 3 minutos para presentar y alcance del MVP. El acceso de un clic solo existe mientras `SEED_DEMO=true`.
+- **`demo@kaimi.co`**: dueño de Timothy y Luna con historia clínica completa (alergia grave, vacunas al día y vencidas, tratamiento en curso, cita próxima, curva de peso, alimento por acabarse, carné con QR).
+- **`clinica@kaimi.co`**: veterinaria y administradora de la Clínica Veterinaria Demo Chicó, con dos pacientes (Timothy y Rocky), registros validados, seguimientos pendientes y dos reseñas verificadas.
+
+También carga 8 lugares ficticios con horarios en el mapa.
+
+Abre **`/onboard`** para el recorrido guiado: botones “Entrar a la demo” y “Entrar como clínica” de un clic, 13 pasos con enlaces directos a cada pantalla, guion de 3 minutos para presentar y alcance. El acceso de un clic solo existe mientras `SEED_DEMO=true`.
 
 Con `SEED_DEMO=true` la cuenta demo se reinicia en cada despliegue o reinicio; cuando termine la demo, bórrala o ponla en `false`. Localmente: `npm run seed:demo`.
 
@@ -79,10 +99,15 @@ Con `SEED_DEMO=true` la cuenta demo se reinicia en cada despliegue o reinicio; c
 ```
 server/                 API Express
   migrations/           Esquema SQL (PostgreSQL 16, sin extensiones)
-  src/routes/           auth, pets, records (historia clínica), share, dashboard, places
+  src/routes/           auth, pets, records, share, dashboard, places, clinics, notifications
+  src/reminders.js      Recordatorios del tablero, seguimientos de clínica y resumen diario
+  src/hours.js          Horarios y "abierto ahora" en hora de Colombia
+  src/plans.js          Planes para clínicas (freemium)
   test/                 Pruebas de integración contra Postgres real
 client/                 SPA React + Vite
-  src/pages/            Inicio, Mascotas, Perfil, Cerca de mí, Cuenta, Vista compartida
+  src/pages/            Inicio, Mascotas, Perfil, Carné, Cerca de mí, Cuenta, vistas públicas
+  src/pages/clinic/     Panel de clínica
+  public/sw.js          Service worker (solo notificaciones push)
   src/components/       Formularios, modales, gráfica de peso, etc.
 Dockerfile, railway.json
 ```
@@ -90,4 +115,6 @@ Dockerfile, railway.json
 ## Notas
 
 - Las teselas del mapa vienen de los servidores públicos de OpenStreetMap, pensados para tráfico bajo. Antes de escalar, cambia a un proveedor de teselas (MapTiler, Stadia, etc.) en `client/src/pages/Places.jsx` y en la CSP de `server/src/app.js`.
-- Las fechas se guardan como `DATE` y el tablero usa la fecha local del navegador para calcular “hoy”.
+- Las fechas se guardan como `DATE` y el tablero usa la fecha local del navegador para calcular “hoy”. Los horarios y el resumen diario usan la hora de Colombia.
+- Las fotos se reducen en el navegador (~640 px) y se guardan en PostgreSQL (`pet_photos`), así sobreviven a los redespliegues sin configurar almacenamiento externo. Si el volumen crece, se pueden mover a S3/R2 sin cambiar la API.
+- El resumen diario lo programa el propio servidor (revisa cada hora desde las 8 a. m.); `notification_log` evita envíos duplicados aunque haya varias instancias.

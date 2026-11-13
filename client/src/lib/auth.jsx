@@ -26,9 +26,23 @@ export function AuthProvider({ children }) {
     setUser({ ...d.user, isNew: true });
   }, []);
 
-  const loginDemo = useCallback(async () => {
-    const d = await api.post('/auth/demo');
+  const loginDemo = useCallback(async (as = 'dueno') => {
+    const d = await api.post('/auth/demo', { as });
     setUser(d.user);
+    return d.user;
+  }, []);
+
+  // Restablecer la contraseña deja la sesión iniciada
+  const resetPassword = useCallback(async (token, password) => {
+    const d = await api.post('/auth/reset', { token, password });
+    setUser(d.user);
+  }, []);
+
+  // Vuelve a leer la sesión (p. ej. tras verificar el correo o unirse a una clínica)
+  const refresh = useCallback(async () => {
+    const d = await api.get('/auth/me');
+    setUser(d.user);
+    return d.user;
   }, []);
 
   const logout = useCallback(async () => {
@@ -41,7 +55,7 @@ export function AuthProvider({ children }) {
     setUser(null);
   }, []);
 
-  return <AuthContext.Provider value={{ user, login, loginDemo, register, logout, deleteAccount }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, setUser, login, loginDemo, register, resetPassword, refresh, logout, deleteAccount }}>{children}</AuthContext.Provider>;
 }
 
 export const useAuth = () => useContext(AuthContext);

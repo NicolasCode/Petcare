@@ -1,10 +1,15 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ApplyModal } from '../components/FollowUps.jsx';
 import Icon from '../components/Icon.jsx';
 import PetAvatar from '../components/PetAvatar.jsx';
 import { Badge } from '../components/RecordSection.jsx';
 import { EmptyState, ErrorState, Spinner } from '../components/States.jsx';
+import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
+import { telLink, waLink } from '../lib/contact.js';
 import { PREVENTIVE_KINDS, SPECIES, age, daysUntil, formatDate, formatDateTime, greeting, relativeDays, todayIso } from '../lib/format.js';
+import { useToast } from '../lib/toast.jsx';
 import { useFetch } from '../lib/useFetch.js';
 
 function buildReminders(r) {
@@ -16,6 +21,7 @@ function buildReminders(r) {
       pet: p,
       title: p.name.toLowerCase().includes(PREVENTIVE_KINDS[p.kind].toLowerCase()) ? p.name : `${PREVENTIVE_KINDS[p.kind]}: ${p.name}`,
       tab: 'vacunas',
+      type: 'preventive',
     })),
     ...r.appointments.map((a) => ({
       key: `a${a.id}`,
@@ -25,6 +31,7 @@ function buildReminders(r) {
       title: a.reason,
       detail: [formatDateTime(a.scheduled_at), a.clinic].filter(Boolean).join(' · '),
       tab: 'citas',
+      type: 'appointment',
     })),
     ...r.food.map((f) => ({
       key: `f${f.pet_id}`,
@@ -48,7 +55,19 @@ function tone(days) {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const toast = useToast();
   const { data, error, loading, reload } = useFetch(`/dashboard?today=${todayIso()}`);
+  const [applying, setApplying] = useState(null);
+
+  const attended = async (r) => {
+    try {
+      await api.post(`/pets/${r.pet.pet_id}/appointments/${r.pet.id}/status`, { status: 'completada' });
+      toast('Cita marcada como atendida');
+      reload();
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  };
 
   if (loading && !data) return <Spinner />;
   if (error && !data) return <ErrorState error={error} onRetry={reload} />;
@@ -104,8 +123,8 @@ export default function Dashboard() {
             ) : (
               <ul className="reminders">
                 {reminders.map((r) => (
-                  <li key={r.key}>
-                    <Link to={`/mascotas/${r.pet.pet_id}?tab=${r.tab}`} className={`reminder reminder-${tone(r.days)}`}>
+                  <li key={r.key} className={`reminder-item reminder-${tone(r.days)}`}>
+                    <Link to={`/mascotas/${r.pet.pet_id}?tab=${r.tab}`} className="reminder">
                       <span className="reminder-icon">
                         <Icon name={r.icon} />
                       </span>
@@ -118,6 +137,35 @@ export default function Dashboard() {
                       </span>
                       <Badge tone={tone(r.days)}>{r.days < 0 ? `Vencido ${relativeDays(r.days)}` : relativeDays(r.days)}</Badge>
                     </Link>
+                    {(r.type || r.pet.clinic_phone || r.pet.clinic_whatsapp) && (
+                      <div className="reminder-actions">
+                        {r.type === 'preventive' && (
+                          <button className="btn btn-secondary btn-sm" onClick={() => setApplying(r.pet)}>
+                            <Icon name="check" size={16} /> Ya se aplicó
+                          </button>
+                        )}
+                        {r.type === 'appointment' && !r.pet.validated && r.days <= 0 && (
+                          <button className="btn btn-secondary btn-sm" onClick={() => attended(r)}>
+                            <Icon name="check" size={16} /> Asistimos
+                          </button>
+                        )}
+                        {r.pet.clinic_whatsapp && (
+                          <a
+                            className="btn btn-ghost btn-sm"
+                            href={waLink(r.pet.clinic_whatsapp, `Hola, quiero agendar para ${r.pet.pet_name}: ${r.title}.`)}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            <Icon name="message" size={16} /> {r.pet.clinic_name}
+                          </a>
+                        )}
+                        {!r.pet.clinic_whatsapp && r.pet.clinic_phone && (
+                          <a className="btn btn-ghost btn-sm" href={telLink(r.pet.clinic_phone)}>
+                            <Icon name="phone" size={16} /> {r.pet.clinic_name}
+                          </a>
+                        )}
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -174,6 +222,19 @@ export default function Dashboard() {
               </section>
             )}
 
+            {user.clinics?.length > 0 && (
+              <Link to="/clinica" className="card urgent-card clinic-card">
+                <span className="urgent-icon">
+                  <Icon name="clinic" />
+                </span>
+                <span>
+                  <strong>Panel de {user.clinics[0].name}</strong>
+                  <span>Pacientes, seguimientos y perfil de tu clínica</span>
+                </span>
+                <Icon name="chevron" />
+              </Link>
+            )}
+
             <Link to="/cerca?tipo=urgencias" className="card urgent-card">
               <span className="urgent-icon">
                 <Icon name="alert" />
@@ -187,6 +248,15 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+      <ApplyModal
+        pending={applying && { ...applying, place_name: applying.clinic_name ?? '' }}
+        pet={applying ? { id: applying.pet_id, species: applying.species } : null}
+        onClose={() => setApplying(null)}
+        onSaved={() => {
+          setApplying(null);
+          reload();
+        }}
+      />
     </div>
   );
 }

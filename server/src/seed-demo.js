@@ -274,7 +274,7 @@ export async function seedDemo({ password = process.env.DEMO_PASSWORD || 'kaimi-
       const petId = await insertPet(client, userId, data, data.pet.usual_clinic === DEMO_CLINIC ? clinic : null);
       if (data.pet.usual_clinic === DEMO_CLINIC) {
         await client.query("INSERT INTO clinic_patients (place_id, pet_id, granted_by, via) VALUES ($1, $2, $3, 'codigo')", [clinic.id, petId, userId]);
-        await client.query('UPDATE pets SET emergency_token = $1 WHERE id = $2', [randomToken(18), petId]);
+        await client.query("UPDATE pets SET emergency_token = $1, emergency_phone = '300 000 0000' WHERE id = $2", [randomToken(18), petId]);
       }
     }
     const rockyId = await insertPet(client, otherUserId, OTHER_PET, clinic);

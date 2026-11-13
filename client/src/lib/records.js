@@ -22,6 +22,17 @@ const quickDue = {
 const SEVERITY = { leve: 'Leve', moderada: 'Moderada', grave: 'Grave' };
 const STATUS = { programada: 'Programada', completada: 'Completada', cancelada: 'Cancelada' };
 
+// Quién respalda el registro: el cuidador o una clínica (con el veterinario que lo validó)
+export function origin(r) {
+  if (r.validated_at) {
+    const who = [r.validated_by_name, r.validated_by_card].filter(Boolean).join(' · ');
+    return { validated: true, text: `Validado por ${r.validated_place_name ?? 'una clínica'}`, detail: who || null };
+  }
+  return { validated: false, text: 'Registrado por el cuidador' };
+}
+
+export const isLocked = (r) => r.source === 'clinica' || Boolean(r.validated_at);
+
 function dueBadge(next) {
   if (!next) return null;
   const d = daysUntil(next);
@@ -51,15 +62,31 @@ export const RECORD_TYPES = {
       },
       { name: 'applied_on', label: 'Fecha de aplicación', type: 'date', required: true, notFuture: true, default: todayIso() },
       { name: 'next_due', label: 'Próximo refuerzo', type: 'date', quick: quickDue, hint: 'Te avisaremos antes de la fecha.' },
-      { name: 'vet', label: 'Veterinario o clínica', max: 100, wide: true },
+      { name: 'lot', label: 'Lote del producto', max: 60, placeholder: 'Está en la etiqueta del carné', when: (v) => v.kind === 'vacuna' },
+      { name: 'product_expires_on', label: 'Vencimiento del producto', type: 'date', when: (v) => v.kind === 'vacuna' },
+      { name: 'vet', label: 'Médico responsable', max: 100, placeholder: 'Ej. Dra. Ana Gómez' },
+      { name: 'vet_card', label: 'Tarjeta profesional', max: 40, placeholder: 'Opcional' },
+      { name: 'place_name', label: 'Clínica', type: 'place', idField: 'place_id', virtual: true, wide: true },
       { name: 'notes', label: 'Notas', type: 'textarea', max: 1000 },
     ],
-    view: (r) => ({
-      title: r.name,
-      subtitle: `${PREVENTIVE_KINDS[r.kind]} · ${formatDate(r.applied_on)}${r.vet ? ` · ${r.vet}` : ''}`,
-      meta: r.next_due ? `Próximo: ${formatDate(r.next_due)}` : null,
-      badge: dueBadge(r.next_due),
-    }),
+    view: (r) => {
+      const expiredProduct = r.product_expires_on && r.product_expires_on < r.applied_on;
+      return {
+        title: r.name,
+        subtitle: [`${PREVENTIVE_KINDS[r.kind]} · ${formatDate(r.applied_on)}`, r.place_name, r.vet].filter(Boolean).join(' · '),
+        meta: [
+          r.next_due && `Próximo: ${formatDate(r.next_due)}`,
+          r.lot && `Lote ${r.lot}`,
+          r.product_expires_on && `Producto vence ${formatDate(r.product_expires_on)}`,
+          r.dismissed_at && 'Recordatorio descartado',
+        ]
+          .filter(Boolean)
+          .join(' · '),
+        warning: expiredProduct ? 'El producto ya estaba vencido el día de la aplicación' : null,
+        badge: r.dismissed_at ? { tone: 'neutral', text: 'No aplica' } : dueBadge(r.next_due),
+        origin: origin(r),
+      };
+    },
   },
   allergies: {
     title: 'Alergias',
@@ -78,6 +105,7 @@ export const RECORD_TYPES = {
       title: r.allergen,
       subtitle: r.reaction,
       badge: { tone: r.severity === 'grave' ? 'danger' : r.severity === 'moderada' ? 'warning' : 'neutral', text: SEVERITY[r.severity] },
+      origin: origin(r),
     }),
   },
   medications: {
@@ -104,6 +132,7 @@ export const RECORD_TYPES = {
         subtitle: [r.dosage, r.frequency].filter(Boolean).join(' · ') || null,
         meta: `${formatDate(r.start_date)} → ${r.end_date ? formatDate(r.end_date) : 'continuo'}`,
         badge: ended ? { tone: 'neutral', text: 'Finalizado' } : upcoming ? { tone: 'neutral', text: 'Próximo' } : { tone: 'ok', text: 'En curso' },
+        origin: origin(r),
       };
     },
   },
@@ -118,15 +147,16 @@ export const RECORD_TYPES = {
       { name: 'scheduled_at', label: 'Fecha y hora', type: 'datetime', required: true },
       { name: 'status', label: 'Estado', type: 'select', options: STATUS, default: 'programada' },
       { name: 'reason', label: 'Motivo', required: true, max: 150, wide: true, placeholder: 'Ej. Control anual, vacunación…' },
-      { name: 'clinic', label: 'Clínica', max: 150 },
+      { name: 'clinic', label: 'Clínica', type: 'place', idField: 'place_id', max: 150 },
       { name: 'vet', label: 'Veterinario', max: 100 },
       { name: 'diagnosis', label: 'Diagnóstico / resultado', type: 'textarea', max: 2000 },
       { name: 'notes', label: 'Notas', type: 'textarea', max: 2000 },
     ],
     view: (r) => ({
       title: r.reason,
-      subtitle: [formatDateTime(r.scheduled_at), r.clinic, r.vet].filter(Boolean).join(' · '),
+      subtitle: [formatDateTime(r.scheduled_at), r.place_name ?? r.clinic, r.vet].filter(Boolean).join(' · '),
       meta: r.diagnosis,
+      origin: origin(r),
       badge:
         r.status === 'programada'
           ? new Date(r.scheduled_at) < new Date()
@@ -147,6 +177,6 @@ export const RECORD_TYPES = {
       { name: 'measured_on', label: 'Fecha', type: 'date', required: true, notFuture: true, default: todayIso() },
       { name: 'notes', label: 'Notas', type: 'textarea', max: 500 },
     ],
-    view: (r) => ({ title: formatKg(r.weight_kg), subtitle: formatDate(r.measured_on), meta: r.notes }),
+    view: (r) => ({ title: formatKg(r.weight_kg), subtitle: formatDate(r.measured_on), meta: r.notes, origin: origin(r) }),
   },
 };

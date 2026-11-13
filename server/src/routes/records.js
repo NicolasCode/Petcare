@@ -10,6 +10,7 @@ const dateOrder = (from, to) => (d) => !d[from] || !d[to] || d[to] >= d[from];
 export const RECORD_TYPES = {
   preventive: {
     table: 'preventive_care',
+    hasPlace: true,
     orderBy: 'applied_on DESC, id DESC',
     schema: z
       .object({
@@ -53,6 +54,7 @@ export const RECORD_TYPES = {
   },
   appointments: {
     table: 'appointments',
+    hasPlace: true,
     orderBy: 'scheduled_at DESC',
     schema: z.object({
       scheduled_at: z.iso.datetime({ offset: true, error: 'Fecha y hora no válidas' }),
@@ -76,9 +78,14 @@ export const RECORD_TYPES = {
   },
 };
 
+// Con el nombre de la clínica enlazada al directorio cuando el registro la tiene
 export async function listRecords(type, petId) {
-  const { table, orderBy } = RECORD_TYPES[type];
-  const { rows } = await query(`SELECT * FROM ${table} WHERE pet_id = $1 ORDER BY ${orderBy}`, [petId]);
+  const { table, orderBy, hasPlace } = RECORD_TYPES[type];
+  const sql = hasPlace
+    ? `SELECT r.*, pl.name AS place_name FROM (SELECT * FROM ${table} WHERE pet_id = $1) r
+       LEFT JOIN places pl ON pl.id = r.place_id ORDER BY ${orderBy}`
+    : `SELECT * FROM ${table} WHERE pet_id = $1 ORDER BY ${orderBy}`;
+  const { rows } = await query(sql, [petId]);
   return rows;
 }
 

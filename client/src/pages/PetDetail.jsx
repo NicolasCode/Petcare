@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import FollowUps from '../components/FollowUps.jsx';
 import Icon from '../components/Icon.jsx';
 import { ConfirmModal } from '../components/Modal.jsx';
-import PetAvatar from '../components/PetAvatar.jsx';
+import { CaregiversPanel, ClinicsPanel, PetPhoto } from '../components/PetPanels.jsx';
 import ProfileSummary from '../components/ProfileSummary.jsx';
 import RecordSection from '../components/RecordSection.jsx';
 import ShareModal from '../components/ShareModal.jsx';
 import { ErrorState, Spinner } from '../components/States.jsx';
 import WeightChart from '../components/WeightChart.jsx';
 import { api } from '../lib/api.js';
+import { useAuth } from '../lib/auth.jsx';
 import { foodStatus, formatDate, petSummary, relativeDays } from '../lib/format.js';
 import { useToast } from '../lib/toast.jsx';
 import { useFetch } from '../lib/useFetch.js';
@@ -28,6 +30,7 @@ export default function PetDetail() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const toast = useToast();
+  const { user } = useAuth();
   const { data, error, loading, reload } = useFetch(`/pets/${petId}/profile`);
   const [sharing, setSharing] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -37,6 +40,7 @@ export default function PetDetail() {
   if (error && !data) return <ErrorState error={error} onRetry={reload} />;
 
   const { pet } = data;
+  const isOwner = data.access_role === 'dueno';
   const tab = TABS.find((t) => t.id === params.get('tab')) ?? TABS[0];
   const records = { preventive: data.preventive, allergies: data.allergies, medications: data.medications, appointments: data.appointments, weights: data.weights };
 
@@ -59,10 +63,11 @@ export default function PetDetail() {
       </Link>
 
       <header className="pet-hero card">
-        <PetAvatar pet={pet} size={72} />
+        <PetPhoto pet={pet} size={72} onChange={reload} />
         <div className="pet-hero-body">
           <h1>{pet.name}</h1>
           <p className="muted">{petSummary(pet)}</p>
+          {!isOwner && <p className="small muted">Cuidas a {pet.name} como parte de su familia</p>}
           {data.allergies.length > 0 && (
             <p className="allergy-flag">
               <Icon name="alert" size={16} /> Alergia: {data.allergies.map((a) => a.allergen).join(', ')}
@@ -70,9 +75,14 @@ export default function PetDetail() {
           )}
         </div>
         <div className="pet-hero-actions">
-          <button className="btn btn-primary" onClick={() => setSharing(true)}>
-            <Icon name="share" size={18} /> <span>Compartir</span>
-          </button>
+          <Link to={`/mascotas/${pet.id}/carne`} className="btn btn-primary">
+            <Icon name="card" size={18} /> <span>Carné</span>
+          </Link>
+          {isOwner && (
+            <button className="btn btn-secondary" onClick={() => setSharing(true)}>
+              <Icon name="share" size={18} /> <span>Compartir</span>
+            </button>
+          )}
           <Link to={`/mascotas/${pet.id}/editar`} className="btn btn-secondary">
             <Icon name="edit" size={18} /> <span>Editar</span>
           </Link>
@@ -104,6 +114,9 @@ export default function PetDetail() {
             </div>
             <ProfileSummary profile={data} />
           </section>
+          <FollowUps profile={data} onChange={reload} />
+          <ClinicsPanel pet={pet} clinics={data.clinics} isOwner={isOwner} onChange={reload} />
+          <CaregiversPanel pet={pet} isOwner={isOwner} currentUserId={user.id} onLeave={() => navigate('/mascotas', { replace: true })} />
           <div className="quick-add">
             {TABS.filter((t) => t.type).map((t) => (
               <button key={t.id} className="quick-tile" onClick={() => setParams({ tab: t.id })}>
@@ -113,21 +126,23 @@ export default function PetDetail() {
               </button>
             ))}
           </div>
-          <button className="btn btn-ghost btn-danger-text" onClick={() => setDeleting(true)}>
-            <Icon name="trash" size={18} /> Eliminar perfil de {pet.name}
-          </button>
+          {isOwner && (
+            <button className="btn btn-ghost btn-danger-text" onClick={() => setDeleting(true)}>
+              <Icon name="trash" size={18} /> Eliminar perfil de {pet.name}
+            </button>
+          )}
         </div>
       )}
 
       {tab.type && (
-        <RecordSection key={tab.type} type={tab.type} pet={pet} records={records[tab.type]} onChange={reload}>
+        <RecordSection key={tab.type} type={tab.type} pet={pet} records={records[tab.type]} reviews={data.reviews} onChange={reload}>
           {tab.type === 'weights' && <WeightChart weights={data.weights} />}
         </RecordSection>
       )}
 
       {tab.id === 'alimento' && <FoodPanel pet={pet} onChange={reload} />}
 
-      <ShareModal pet={pet} open={sharing} onClose={() => setSharing(false)} />
+      {isOwner && <ShareModal pet={pet} open={sharing} onClose={() => setSharing(false)} />}
       <ConfirmModal
         open={deleting}
         title={`¿Eliminar a ${pet.name}?`}

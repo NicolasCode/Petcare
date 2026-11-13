@@ -6,14 +6,15 @@ export class ApiError extends Error {
   }
 }
 
-async function request(method, url, body) {
+async function request(method, url, body, contentType) {
   let res;
+  const raw = body instanceof Blob;
   try {
     res = await fetch(`/api${url}`, {
       method,
       credentials: 'same-origin',
-      headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      headers: body !== undefined ? { 'Content-Type': raw ? contentType : 'application/json' } : undefined,
+      body: body === undefined ? undefined : raw ? body : JSON.stringify(body),
     });
   } catch {
     throw new ApiError(0, 'No hay conexión. Revisa tu internet e inténtalo de nuevo.');
@@ -32,4 +33,6 @@ export const api = {
   post: (url, body = {}) => request('POST', url, body),
   put: (url, body) => request('PUT', url, body),
   del: (url) => request('DELETE', url),
+  // Sube un archivo tal cual (fotos)
+  upload: (url, blob) => request('PUT', url, blob, blob.type),
 };
