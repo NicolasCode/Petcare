@@ -26,7 +26,7 @@ const SECTIONS = [
   {
     title: 'Salud',
     fields: [
-      { name: 'usual_clinic', label: 'Clínica habitual', max: 150, placeholder: 'Ej. Clínica Veterinaria del Norte' },
+      { name: 'usual_clinic', label: 'Clínica habitual', type: 'place', idField: 'usual_place_id', max: 150, hint: 'Si está en el directorio, tendrás sus datos de contacto a mano.' },
       { name: 'microchip', label: 'Número de microchip', max: 40 },
       { name: 'notes', label: 'Notas importantes', type: 'textarea', max: 2000, placeholder: 'Condiciones crónicas, comportamiento en consulta…' },
     ],
@@ -51,7 +51,8 @@ function PetFormInner({ pet }) {
   const form = useForm(ALL_FIELDS, pet, async (payload) => {
     const res = pet ? await api.put(`/pets/${pet.id}`, payload) : await api.post('/pets', payload);
     toast(pet ? 'Perfil actualizado' : `¡${res.pet.name} ya tiene su perfil!`);
-    navigate(`/mascotas/${res.pet.id}`, { replace: true });
+    // Al venir del enlace de una clínica, se vuelve a la vinculación
+    navigate(location.state?.returnTo ?? `/mascotas/${res.pet.id}`, { replace: true });
   });
 
   return (

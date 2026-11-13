@@ -1,9 +1,9 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Field, FormError } from '../components/Field.jsx';
 import Icon from '../components/Icon.jsx';
 import Logo from '../components/Logo.jsx';
-import { ApiError } from '../lib/api.js';
+import { ApiError, api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 
 function AuthShell({ title, subtitle, children }) {
@@ -95,6 +95,9 @@ export function Login() {
         <Field label="Contraseña" error={f.errors.password}>
           {(p) => <PasswordInput autoComplete="current-password" required {...p} {...f.bind('password')} />}
         </Field>
+        <p className="auth-forgot">
+          <Link to="/recuperar">¿Olvidaste tu contraseña?</Link>
+        </p>
         <button className="btn btn-primary btn-block btn-lg" disabled={f.busy}>
           {f.busy ? 'Ingresando…' : 'Ingresar'}
         </button>
@@ -142,6 +145,109 @@ export function Register() {
       <p className="auth-switch">
         ¿Ya tienes cuenta? <Link to="/ingresar">Ingresa</Link>
       </p>
+    </AuthShell>
+  );
+}
+
+export function ForgotPassword() {
+  const [sent, setSent] = useState(null);
+  const f = useAuthForm({ email: '' }, async (v) => {
+    await api.post('/auth/forgot', { email: v.email });
+    setSent(v.email);
+  });
+  return (
+    <AuthShell title="Recupera tu cuenta" subtitle="Te enviaremos un enlace para crear una contraseña nueva.">
+      {sent ? (
+        <div className="stack">
+          <div className="alert alert-ok">
+            Si existe una cuenta con <strong>{sent}</strong>, en unos minutos te llegará el enlace. Revisa también la carpeta de spam. El enlace vence en 1 hora.
+          </div>
+          <Link className="btn btn-secondary btn-block" to="/ingresar">
+            Volver a ingresar
+          </Link>
+        </div>
+      ) : (
+        <form onSubmit={f.onSubmit} className="stack" noValidate>
+          <FormError error={f.error} />
+          <Field label="Correo electrónico" error={f.errors.email}>
+            {(p) => <input type="email" autoComplete="email" inputMode="email" required {...p} {...f.bind('email')} />}
+          </Field>
+          <button className="btn btn-primary btn-block btn-lg" disabled={f.busy}>
+            {f.busy ? 'Enviando…' : 'Enviar enlace'}
+          </button>
+        </form>
+      )}
+      {!sent && (
+        <p className="auth-switch">
+          <Link to="/ingresar">Volver a ingresar</Link>
+        </p>
+      )}
+    </AuthShell>
+  );
+}
+
+export function ResetPassword() {
+  const { token } = useParams();
+  const { resetPassword } = useAuth();
+  const navigate = useNavigate();
+  const f = useAuthForm({ password: '' }, async (v) => {
+    await resetPassword(token, v.password);
+    navigate('/', { replace: true });
+  });
+  return (
+    <AuthShell title="Crea una contraseña nueva" subtitle="Al guardarla se cerrará la sesión en tus otros dispositivos.">
+      <form onSubmit={f.onSubmit} className="stack" noValidate>
+        <FormError error={f.error} />
+        <Field label="Contraseña nueva" error={f.errors.password} hint="Mínimo 8 caracteres.">
+          {(p) => <PasswordInput autoComplete="new-password" minLength={8} required {...p} {...f.bind('password')} />}
+        </Field>
+        <button className="btn btn-primary btn-block btn-lg" disabled={f.busy}>
+          {f.busy ? 'Guardando…' : 'Guardar y entrar'}
+        </button>
+      </form>
+      <p className="auth-switch">
+        ¿El enlace venció? <Link to="/recuperar">Pide uno nuevo</Link>
+      </p>
+    </AuthShell>
+  );
+}
+
+export function VerifyEmail() {
+  const { token } = useParams();
+  const { user, refresh } = useAuth();
+  const [state, setState] = useState({ status: 'loading' });
+  const started = useRef(false);
+  useEffect(() => {
+    // El token es de un solo uso: evita el doble envío del modo estricto de React
+    if (started.current) return;
+    started.current = true;
+    api
+      .post('/auth/verify', { token })
+      .then(() => {
+        setState({ status: 'ok' });
+        refresh().catch(() => {});
+      })
+      .catch((err) => setState({ status: 'error', message: err.message }));
+  }, [token, refresh]);
+  return (
+    <AuthShell title="Confirmación de correo" subtitle="">
+      {state.status === 'loading' ? (
+        <span className="spinner" />
+      ) : state.status === 'ok' ? (
+        <div className="stack">
+          <div className="alert alert-ok">¡Listo! Tu correo quedó confirmado. Te enviaremos ahí los recordatorios de tus mascotas.</div>
+          <Link className="btn btn-primary btn-block" to={user ? '/' : '/ingresar'}>
+            {user ? 'Ir a Kaimi' : 'Ingresar'}
+          </Link>
+        </div>
+      ) : (
+        <div className="stack">
+          <FormError error={state.message} />
+          <Link className="btn btn-secondary btn-block" to={user ? '/cuenta' : '/ingresar'}>
+            {user ? 'Pedir otro enlace desde Mi cuenta' : 'Ingresar'}
+          </Link>
+        </div>
+      )}
     </AuthShell>
   );
 }

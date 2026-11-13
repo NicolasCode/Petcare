@@ -232,6 +232,17 @@ describe('datos de demostración', () => {
       const res = await agent.post('/api/auth/demo');
       assert.equal(res.status, 200);
       assert.equal((await agent.get('/api/pets')).body.pets.length, 2);
+
+      // Cuenta de la clínica demo: dos pacientes vinculados y seguimientos pendientes
+      const clinic = request.agent(app);
+      const me = await clinic.post('/api/auth/demo').send({ as: 'clinica' });
+      const placeId = me.body.user.clinics[0].place_id;
+      const patients = await clinic.get(`/api/clinics/${placeId}/patients`);
+      assert.deepEqual(patients.body.patients.map((p) => p.name), ['Rocky', 'Timothy']);
+      const follow = await clinic.get(`/api/clinics/${placeId}/follow-ups`);
+      assert.ok(follow.body.preventive.some((p) => p.pet_name === 'Rocky'));
+      const place = await request(app).get(`/api/places/${placeId}`);
+      assert.equal(place.body.reviews.length, 2);
     } finally {
       delete process.env.SEED_DEMO;
     }

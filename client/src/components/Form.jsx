@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ApiError } from '../lib/api.js';
 import { addToIso, todayIso } from '../lib/format.js';
+import { findPlaceByName, loadPlaces, usePlaces } from '../lib/places.js';
 import { Field, FormError } from './Field.jsx';
 
 // Convierte un ISO con zona horaria al formato de <input type="datetime-local">
@@ -21,11 +22,16 @@ export function initialValues(fields, record = {}) {
   return values;
 }
 
-function toPayload(fields, values) {
+// Un campo 'place' guarda el texto y, si coincide con un lugar del directorio, su id en f.idField.
+// Con f.virtual solo se envía el id (la tabla no tiene columna de texto)
+function toPayload(fields, values, places) {
   const out = {};
   for (const f of fields) {
     const v = values[f.name];
-    if (f.type === 'number') out[f.name] = v === '' ? '' : Number(v);
+    if (f.type === 'place') {
+      out[f.idField] = findPlaceByName(places, v)?.id ?? null;
+      if (!f.virtual) out[f.name] = v.trim();
+    } else if (f.type === 'number') out[f.name] = v === '' ? '' : Number(v);
     else if (f.type === 'datetime') out[f.name] = v ? new Date(v).toISOString() : '';
     else out[f.name] = typeof v === 'string' ? v.trim() : v;
   }
@@ -55,7 +61,8 @@ export function useForm(fields, record, onSubmit) {
     setBusy(true);
     setFormError(null);
     try {
-      await onSubmit(toPayload(fields, values));
+      const places = fields.some((f) => f.type === 'place') ? await loadPlaces().catch(() => []) : [];
+      await onSubmit(toPayload(fields, values, places));
     } catch (err) {
       if (err instanceof ApiError && Object.keys(err.fields ?? {}).length) {
         setErrors(err.fields);
@@ -127,6 +134,8 @@ function Input({ field: f, value, onChange, values, ...props }) {
       return <input type="date" max={f.notFuture ? todayIso() : undefined} {...common} />;
     case 'datetime':
       return <input type="datetime-local" {...common} />;
+    case 'place':
+      return <PlaceInput field={f} {...common} id={props.id} />;
     case 'number':
       return (
         <div className={f.unit ? 'input-unit' : undefined}>
@@ -155,6 +164,23 @@ function Input({ field: f, value, onChange, values, ...props }) {
         </>
       );
   }
+}
+
+// Texto libre con sugerencias del directorio de Kaimi
+function PlaceInput({ field: f, id, ...props }) {
+  const places = usePlaces();
+  return (
+    <>
+      <input type="text" placeholder={f.placeholder ?? 'Busca en el directorio o escribe el nombre'} maxLength={f.max} autoComplete="off" list={`${id}-places`} id={id} {...props} />
+      <datalist id={`${id}-places`}>
+        {places.map((p) => (
+          <option key={p.id} value={p.name}>
+            {[p.locality, p.address].filter(Boolean).join(' · ')}
+          </option>
+        ))}
+      </datalist>
+    </>
+  );
 }
 
 export { FormError };

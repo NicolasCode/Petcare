@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
+import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import Icon from './Icon.jsx';
 import Logo from './Logo.jsx';
@@ -10,8 +12,39 @@ const NAV = [
   { to: '/cuenta', label: 'Mi cuenta', short: 'Cuenta', icon: 'user' },
 ];
 
-export default function Layout() {
+// Aviso para confirmar el correo: sin él no hay recordatorios por correo ni recuperación de cuenta
+function VerifyBanner({ user }) {
+  const [state, setState] = useState(null);
+  if (user.email_verified || state === 'hidden') return null;
+  const resend = async () => {
+    setState('sending');
+    await api.post('/auth/verify/resend').catch(() => {});
+    setState('sent');
+  };
+  return (
+    <div className="verify-banner" role="status">
+      <Icon name="bell" size={18} />
+      <span>
+        {state === 'sent' ? `Te enviamos el enlace a ${user.email}.` : 'Confirma tu correo para recibir los recordatorios y poder recuperar tu cuenta.'}
+      </span>
+      {state !== 'sent' && (
+        <button className="link-btn" onClick={resend} disabled={state === 'sending'}>
+          Reenviar correo
+        </button>
+      )}
+      <button className="icon-btn" onClick={() => setState('hidden')} aria-label="Ocultar aviso">
+        <Icon name="close" size={16} />
+      </button>
+    </div>
+  );
+}
+
+export default function Layout({ children }) {
   const { user } = useAuth();
+  // Quien trabaja en una clínica ve su panel en la navegación
+  const nav = user.clinics?.length ? [...NAV.slice(0, 3), { to: '/clinica', label: 'Mi clínica', short: 'Clínica', icon: 'clinic' }, NAV[3]] : NAV;
+  // La administración va solo en la barra lateral para no saturar la de móvil
+  const sideNav = user.is_admin ? [...nav, { to: '/admin', label: 'Administración', icon: 'shield' }] : nav;
   return (
     <div className="app-shell">
       <a href="#main" className="skip-link">
@@ -20,7 +53,7 @@ export default function Layout() {
       <aside className="sidebar">
         <Logo />
         <nav aria-label="Principal">
-          {NAV.map((item) => (
+          {sideNav.map((item) => (
             <NavLink key={item.to} to={item.to} end={item.end} className="side-link">
               <Icon name={item.icon} />
               {item.label}
@@ -38,11 +71,12 @@ export default function Layout() {
       </header>
 
       <main id="main" className="main">
-        <Outlet />
+        <VerifyBanner user={user} />
+        {children ?? <Outlet />}
       </main>
 
       <nav className="tabbar" aria-label="Principal">
-        {NAV.map((item) => (
+        {nav.map((item) => (
           <NavLink key={item.to} to={item.to} end={item.end} className="tab-link">
             <Icon name={item.icon} size={22} />
             <span>{item.short ?? item.label}</span>

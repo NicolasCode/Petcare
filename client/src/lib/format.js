@@ -19,8 +19,45 @@ export const PLACE_KINDS = {
   clinica: { label: 'Clínica', color: '#5a33b5' },
   urgencias: { label: 'Urgencias', color: '#d63a4a' },
   farmacia: { label: 'Farmacia', color: '#2f6fd0' },
-  domicilio: { label: 'A domicilio', color: '#b26a00' },
+  independiente: { label: 'Vet independiente', color: '#b26a00' },
 };
+
+export const WEEKDAYS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
+// '18:00' -> '6:00 p. m.'
+export function formatTime(hhmm) {
+  const [h, m] = hhmm.split(':').map(Number);
+  return new Date(2000, 0, 1, h, m).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' });
+}
+
+// Hora de un instante en Colombia (los avisos de las clínicas se leen en su hora local)
+export const bogotaTime = (iso) => new Date(iso).toLocaleTimeString('es-CO', { timeZone: 'America/Bogota', hour: 'numeric', minute: '2-digit' });
+
+// Estado del horario que calcula el servidor en hora de Colombia
+export function openText(status, open24h) {
+  if (!status || status.open === null) return null;
+  if (open24h) return { tone: 'ok', text: 'Abierto 24 horas' };
+  if (status.open) return { tone: 'ok', text: status.closes_at ? `Abierto · cierra a las ${formatTime(status.closes_at)}` : 'Abierto' };
+  if (!status.opens_at) return { tone: 'neutral', text: 'Cerrado' };
+  const { in_days, weekday, time } = status.opens_at;
+  const when = in_days === 0 ? 'hoy' : in_days === 1 ? 'mañana' : `el ${WEEKDAYS[weekday].toLowerCase()}`;
+  return { tone: 'neutral', text: `Cerrado · abre ${when} a las ${formatTime(time)}` };
+}
+
+export const slugify = (s) =>
+  s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+
+export const placeUrl = (p) => `/clinicas/${p.id}-${slugify(p.name)}`;
+
+// Lista separada por comas -> etiquetas
+export const tags = (s) => (s ? s.split(/[,\n]/).map((t) => t.trim()).filter(Boolean) : []);
+
+export const photoUrl = (key) => (key ? `/api/photos/${key}` : null);
 
 // Fecha local en formato YYYY-MM-DD (no UTC)
 export function localIso(date = new Date()) {

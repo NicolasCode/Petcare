@@ -26,6 +26,12 @@ export const optDate = z
 
 export const id = z.coerce.number().int().positive();
 
+// Referencia opcional a otra tabla: '' o null se guardan como NULL
+export const optId = z
+  .union([z.literal(''), z.null(), z.coerce.number().int().positive()])
+  .optional()
+  .transform((v) => v || null);
+
 // Número positivo opcional: '' o null se guardan como NULL
 export const optPositive = (max, { int = false } = {}) =>
   z
@@ -35,6 +41,9 @@ export const optPositive = (max, { int = false } = {}) =>
     .refine((v) => v === null || (v > 0 && v <= max && (!int || Number.isInteger(v))), 'Valor no válido');
 
 export const todayIso = () => new Date().toISOString().slice(0, 10);
+
+// Fecha de hoy en Colombia (los recordatorios y horarios se calculan en hora local)
+export const bogotaTodayIso = (date = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(date);
 
 // Inserta/actualiza solo las columnas declaradas en el esquema (nunca entrada del usuario)
 export function insertSql(table, data, extra = {}) {
